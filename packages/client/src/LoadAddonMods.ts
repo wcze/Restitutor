@@ -46,15 +46,25 @@ const definitions = {
 };
 
 export async function loadAddonMods(): Promise<void> {
-   if (isSteam()) {
-      const mods = await SteamClient.loadAddonMods();
-      if (mods.length > 0) {
-         Object.assign(globalThis, { G, GameStateUpdated, D: definitions });
+   let mods: string[] = [];
+   if (import.meta.env.DEV) {
+      try {
+         const response = await fetch("/addon/index.js");
+         if (response.ok) {
+            mods.push(await response.text());
+         }
+      } catch (error) {
+         console.error("Failed to load the local development addon", error);
       }
-      for (const mod of mods) {
-         const script = document.createElement("script");
-         script.textContent = mod;
-         document.body.appendChild(script);
-      }
+   } else if (isSteam()) {
+      mods = await SteamClient.loadAddonMods();
+   }
+   if (mods.length > 0) {
+      Object.assign(globalThis, { G, GameStateUpdated, D: definitions });
+   }
+   for (const mod of mods) {
+      const script = document.createElement("script");
+      script.textContent = mod;
+      document.body.appendChild(script);
    }
 }
