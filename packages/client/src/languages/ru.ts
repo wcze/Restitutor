@@ -164,6 +164,8 @@ export const RU = {
    CensorialOversight: "Цензорский надзор",
    Chance: "Шанс",
    ChangeRival: "Сменить соперника",
+   TCChangeTileOutput: "Изменить производимый ресурс",
+   TCChangeTileOutputCooldown: "После последней смены ресурса должно пройти не менее 6 месяцев",
    ChangingRivalCanOnlyBeDoneOnceEvery$1Months: "Смена соперника возможна только раз в $1 месяцев",
    ChannelOurStrengthIntoProduction: "Направить наши силы на производство",
    ChooseOne: "(Выберите одно)",

@@ -26,6 +26,8 @@ export interface ITileData {
    culture: Culture;
    religion: Religion;
    goods: Goods;
+   goodsOptions?: Goods[];
+   goodsChangedAt?: number;
    buildings: Set<Building>;
 
    infrastructure: number;
@@ -63,10 +65,10 @@ export function getBorderingProvinces(tile: Tile, save: SaveGame): Province[] {
 }
 
 export const TerrainToGoods: Record<Terrain, Goods[]> = {
-   Forest: ["wood"],
-   Mountain: ["ironOre", "wood"],
+   Forest: ["wood", "livestock", "ironOre"],
+   Mountain: ["ironOre", "wood", "livestock"],
    Hill: ["ironOre", "livestock", "wood"],
-   Plain: ["grain", "livestock"],
+   Plain: ["grain", "livestock", "wood"],
    Arid: ["ironOre", "grain", "livestock"],
 };
 
@@ -78,16 +80,22 @@ export function initTiles(): Map<Tile, ITileData> {
             throw new Error(`Invalid tile config: ${tile}: ${JSON.stringify(config)}`);
          }
          const { x, y } = tileToPoint(tile);
-         const random = (noise(x, y) + 1) / 2;
          const terrain = getTileTerrain(tile);
-         const goods = TerrainToGoods[terrain];
-         const data: ITileData = initTileData(config.province, goods[Math.floor(random * goods.length)]);
+         const terrainGoods = TerrainToGoods[terrain];
+         const countRandom = Math.random();
+         const count = countRandom < 0.5 ? 1 : countRandom < 0.9 ? 2 : 3;
+         const options = terrainGoods
+            .map((goods, index) => ({ goods, value: (noise(x + 1000 + index * 37, y - 1000) + 1) / 2 }))
+            .sort((a, b) => a.value - b.value)
+            .slice(0, Math.min(count, terrainGoods.length))
+            .map(({ goods }) => goods);
+         const data: ITileData = initTileData(config.province, options[0], options);
          return [tile, data];
       }),
    );
 }
 
-export function initTileData(province: Province, goods: Goods): ITileData {
+export function initTileData(province: Province, goods: Goods, goodsOptions: Goods[] = [goods]): ITileData {
    const provinceConfig = Province[province];
    return {
       province: province,
@@ -96,6 +104,7 @@ export function initTileData(province: Province, goods: Goods): ITileData {
       culture: provinceConfig.culture,
       religion: provinceConfig.religion,
       goods: goods,
+      goodsOptions: goodsOptions,
       buildings: new Set(),
       infrastructure: 0,
       production: 0,

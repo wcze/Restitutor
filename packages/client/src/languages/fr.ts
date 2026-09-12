@@ -164,6 +164,8 @@ export const FR = {
    CensorialOversight: "Contrôle censorial",
    Chance: "Chance",
    ChangeRival: "Changer de rival",
+   TCChangeTileOutput: "Changer la ressource produite",
+   TCChangeTileOutputCooldown: "Au moins 6 mois doivent s'être écoulés depuis le dernier changement de ressource",
    ChangingRivalCanOnlyBeDoneOnceEvery$1Months: "Changer de rival ne peut être fait qu’une fois tous les $1 mois",
    ChannelOurStrengthIntoProduction: "Canaliser notre puissance vers la production",
    ChooseOne: "(Choisir un élément)",

@@ -41,6 +41,7 @@ import { $t, L } from "../utils/i18n";
 import { ActionButton } from "./ActionButton";
 import { AppeaseButton } from "./AppeaseButton";
 import { BreakdownRow, BreakdownTooltip } from "./BreakdownRow";
+import { ConditionBreakdownComp } from "./ConditionBreakdownComp";
 import { CrackDownButton } from "./CrackDownButton";
 import { CircleComp } from "./common/CircleComp";
 import { showPanel } from "./common/ShowPanel";
@@ -53,6 +54,8 @@ import { GreatWorkComponent } from "./GreatWorkComponent";
 import { MakeCoreButton } from "./MakeCoreButton";
 import { SettleTilePage } from "./SettleTilePage";
 import { TileBuildingsModal } from "./TileBuildingsModal";
+import { getTileGoodsChangeCondition, TileGoodsChangeCost, TileGoodsModal } from "./TileGoodsModal";
+import { ResourceCostComp } from "./ResourceCostComp";
 import { Grid2 } from "./UIConstant";
 import { UpgradeInfrastructureButton, UpgradePopulationButton, UpgradeProductionButton } from "./UpgradeButtons";
 import { WarTooltip } from "./WarTooltip";
@@ -276,14 +279,36 @@ export function TilePage({ tile }: { tile: Tile }): React.ReactNode {
                />
             </div>
             <div className="f1">
-               <BreakdownTooltip breakdown={tileProduction}>
-                  <div className="row my5">
+               <div className="row my5">
+                  <BreakdownTooltip breakdown={tileProduction}>
                      <div className="f1">{$t(L.TileOutput)}</div>
-                     <div>
-                        {formatNumber(tileProduction.value)} {Goods[tileData.goods].name()}
-                     </div>
+                  </BreakdownTooltip>
+                  {(tileData.goodsOptions?.length ?? 1) > 1 && (
+                     <FloatingTip
+                        fixedWidth
+                        className="p0"
+                        label={() => (
+                           <>
+                              <div className="h2">{$t(L.TCChangeTileOutput)}</div>
+                              <ConditionBreakdownComp condition={getTileGoodsChangeCondition(tile)} />
+                              <div className="h2">{$t(L.TheFollowingResourcesWillBeSpent)}</div>
+                              <ResourceCostComp cost={TileGoodsChangeCost} />
+                           </>
+                        )}
+                     >
+                        <button
+                           className="btn text-sm"
+                           disabled={tileData.province !== G.save.state.playerProvince}
+                           onClick={() => showPanel(TileGoodsModal, { tile })}
+                        >
+                           <span className="mi sm">swap_horiz</span>
+                        </button>
+                     </FloatingTip>
+                  )}
+                  <div>
+                     {formatNumber(tileProduction.value)} {Goods[tileData.goods].name()}
                   </div>
-               </BreakdownTooltip>
+               </div>
                <FloatingTip
                   fixedWidth
                   className="p0"

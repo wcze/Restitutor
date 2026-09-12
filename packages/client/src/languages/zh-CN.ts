@@ -163,6 +163,8 @@ export const ZH_CN = {
    CensorialOversight: "监察监督",
    Chance: "概率",
    ChangeRival: "更换宿敌",
+   TCChangeTileOutput: "更改产出资源",
+   TCChangeTileOutputCooldown: "距离上次更改产出资源必须至少经过6个月",
    ChangingRivalCanOnlyBeDoneOnceEvery$1Months: "更换宿敌每 $1 个月只能进行一次",
    ChannelOurStrengthIntoProduction: "将我们的力量投入生产",
    ChooseOne: "（选择一项）",

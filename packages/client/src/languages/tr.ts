@@ -164,6 +164,8 @@ export const TR = {
    CensorialOversight: "Censorial Oversight",
    Chance: "Chance",
    ChangeRival: "Change Rival",
+   TCChangeTileOutput: "Üretim Kaynağını Değiştir",
+   TCChangeTileOutputCooldown: "Son kaynak değişikliğinden bu yana en az 6 ay geçmelidir",
    ChangingRivalCanOnlyBeDoneOnceEvery$1Months: "Changing rival can only be done once every $1 months",
    ChannelOurStrengthIntoProduction: "Channel our strength into production",
    ChooseOne: "(Choose One)",

@@ -312,6 +312,10 @@ export class WorldScene extends Scene {
          return;
       }
       const { x, y } = MapGrid.gridToPosition(tileToPoint(tile));
+      const capital = this._capitalContainer.map.get(tile);
+      if (capital) {
+         capital.position.set(x, y + (getOverlay() === "Output" ? -0.3 : 0.25) * TileHeight);
+      }
       switch (getOverlay()) {
          case "Terrain": {
             const visual = this._renderTerrain(tile);
@@ -319,12 +323,26 @@ export class WorldScene extends Scene {
             break;
          }
          case "Output": {
-            const visual = new Sprite(G.textures.get(Goods[tileData.goods].iconTexture));
-            this._overlayContainer.map.set(tile, visual);
-            visual.anchor.set(0.5, 0.5);
-            visual.position.set(x, y);
-            visual.scale.set((0.75 * TileHeight) / TextureHeight);
-            visual.tint = MapForegroundColors[tileData.province];
+            const options = [tileData.goods, ...(tileData.goodsOptions ?? []).filter((goods) => goods !== tileData.goods)];
+            const container = new Container();
+            this._overlayContainer.map.set(tile, container);
+            container.position.set(x, y);
+            options.forEach((goods, index) => {
+               const visual = new Sprite(G.textures.get(Goods[goods].iconTexture));
+               visual.anchor.set(0.5, 0.5);
+               const offset =
+                  index === 0
+                     ? [0, 0]
+                     : options.length === 2
+                       ? [0, 0.28]
+                       : index === 1
+                         ? [-0.22, 0.28]
+                         : [0.22, 0.28];
+               visual.position.set(offset[0] * TileHeight, offset[1] * TileHeight);
+               visual.scale.set(((index === 0 ? 0.62 : 0.32) * TileHeight) / TextureHeight);
+               visual.tint = MapForegroundColors[tileData.province];
+               container.addChild(visual);
+            });
             break;
          }
          case "Upgrade": {
