@@ -1,5 +1,5 @@
-import { Progress, Slider } from "@mantine/core";
-import { clamp, formatNumber, formatPercent, type Tile } from "@project/shared/src/utils/Helper";
+import { Progress } from "@mantine/core";
+import { formatNumber, formatPercent, type Tile } from "@project/shared/src/utils/Helper";
 import { Fragment } from "react/jsx-runtime";
 import { finalizeCondition } from "../game/actions/GameAction";
 import { Buildings } from "../game/definitions/Building";
@@ -53,6 +53,7 @@ import { DiplomacyPage } from "./DiplomacyPage";
 import { GreatWorkComponent } from "./GreatWorkComponent";
 import { MakeCoreButton } from "./MakeCoreButton";
 import { SettleTilePage } from "./SettleTilePage";
+import { TileAutonomyComp } from "./TileAutonomyComp";
 import { TileBuildingsModal } from "./TileBuildingsModal";
 import { getTileGoodsChangeCondition, TileGoodsChangeCost, TileGoodsModal } from "./TileGoodsModal";
 import { ResourceCostComp } from "./ResourceCostComp";
@@ -92,6 +93,7 @@ export function TilePage({ tile }: { tile: Tile }): React.ReactNode {
             <div className="row my5">
                <div className="f1">{$t(L.Province)}</div>
                <button
+                  id={`TilePage_Diplomacy_${tileData.province}`}
                   onClick={() => showPanel(DiplomacyPage, { province: tileData.province })}
                   className="btn text-sm"
                >
@@ -385,56 +387,7 @@ export function TilePage({ tile }: { tile: Tile }): React.ReactNode {
                <div className="mi lg">add</div>
             </button>
          </div>
-         <div className="h1 my10">{$t(L.Autonomy)}</div>
-         {isMyProvince && (
-            <>
-               <Slider
-                  className="mx10"
-                  min={0}
-                  max={100}
-                  step={1}
-                  value={tileData.autonomy}
-                  onChange={(value) => {
-                     tileData.autonomy = value;
-                     GameStateUpdated.emit();
-                  }}
-               />
-               <div className="h5" />
-            </>
-         )}
-         <FloatingTip
-            fixedWidth
-            className="p0"
-            label={() => (
-               <>
-                  <div className="h2">{$t(L.Autonomy)}</div>
-                  <div className="m10">{$t(L.AutonomyTooltip)}</div>
-                  {isMyProvince && (
-                     <>
-                        <div className="h2">{$t(L.SettleUnrest)}</div>
-                        <div className="m10">{$t(L.SettlingUnrestAdjustsAutonomySoThatTileUnrestIsAtMost$1, "0")}</div>
-                     </>
-                  )}
-               </>
-            )}
-         >
-            <div className="row mx10">
-               <div className="f1">{$t(L.Autonomy)}</div>
-               {isMyProvince && (
-                  <button
-                     className="btn text-sm"
-                     onClick={() => {
-                        const unrest = getTileUnrest(tile, G.save).value;
-                        tileData.autonomy = clamp(tileData.autonomy + Math.ceil(unrest), 0, 100);
-                        GameStateUpdated.emit();
-                     }}
-                  >
-                     {$t(L.SettleUnrest)}
-                  </button>
-               )}
-               <div>{tileData.autonomy}</div>
-            </div>
-         </FloatingTip>
+         <TileAutonomyComp key={`${tile}:${tileData.province}`} tile={tile} />
          <div className="h1 my10">{$t(L.Rebellion)}</div>
          {tileData.rebellion >= 10 && (
             <div className="mx10 my5 text-red">{$t(L.$1IsInCurrentRebellion, getTileName(tile, G.save))}</div>

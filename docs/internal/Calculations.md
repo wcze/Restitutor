@@ -145,6 +145,17 @@ export const getEventChecks = defineConditionChecks(eventChecks);
 
 Only the public getter is wrapped. Nested generators are producers, not independently evaluated getters; `yield*` forwards yielded predicates, explanation handles, completion, and early closure without creating an intermediate evaluator or breakdown. A `for...of` loop must not replace `yield*`, because it cannot forward explanation handles back to the nested generator.
 
+For legacy condition arrays, use `toConditions(checks)` to evaluate a raw producer into `ICondition[]`:
+
+```ts
+condition: finalizeCondition([
+   ...toConditions(requirePeaceBetweenChecks(ourProvince, theirProvince, save)),
+   requireHigherPrestige(ourProvince, theirProvince, 1, save),
+]),
+```
+
+`toConditions` consumes the generator with breakdown semantics, eagerly evaluating every check and its presentation metadata. It collects explanation items directly into an array without creating a `ConditionCalculation` or aggregate breakdown wrapper, or computing an aggregate boolean. Generator, iterator-result, explanation-item, and array allocations remain. It returns an empty array for an empty generator and preserves the order and metadata of multiple checks. This is a compatibility bridge, not a value-mode optimization. Within migrated generators, keep using direct `yield*` composition instead of converting to legacy arrays.
+
 Unmigrated paths may still use eager `ICondition` or `ICondition[]` producers. Once invoked, those producers construct all condition objects and presentation metadata before their results can be evaluated, so do not call them from migrated event producers.
 
 Unlike the identity declaration helpers, `defineConditionChecks` has a runtime driver: each evaluation uses an argument array, a generator instance, and iterator-result objects. Delegated generators add their own iterator overhead but no nested evaluator or breakdown allocation. Value mode creates no condition accumulator, explanation items, breakdown arrays, or presentation metadata in migrated producers. Gameplay dependencies may still allocate legacy breakdowns or collections, so this is not an allocation-free guarantee for the full call graph. Generator overhead can outweigh short-circuit savings when most checks pass, so profile representative early-failing, late-failing, and all-passing workloads before expanding migration.

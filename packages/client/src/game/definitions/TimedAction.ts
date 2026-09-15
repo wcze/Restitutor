@@ -3,9 +3,10 @@ import { startTrack } from "../../ui/Music";
 import { $t, L } from "../../utils/i18n";
 import { finalizeCondition, type IGameCostCondition } from "../actions/GameAction";
 import type { SaveGame } from "../GameState";
+import { onGeneralEnded } from "../logic/ArmyLogic";
 import { getTotalUpgrades } from "../logic/ProvinceLogic";
 import { timedActionConditions } from "../logic/TimedActionLogic";
-import { BreachOfThePeaceDurationYear, onGeneralEnded } from "../logic/WarLogic";
+import { BreachOfThePeaceDurationYear } from "../logic/WarLogic";
 import { CasusBelli } from "./CasusBelli";
 import { Price } from "./Goods";
 import type { IBaseModifier, Modifier } from "./Modifier";
@@ -124,11 +125,17 @@ class TimedActionDefinitions {
          WarPower: { type: "multiply", value: 0.1 },
       },
    };
-   MakeWarSpeech: ITimedAction = {
-      name: () => $t(L.MakeWarSpeech),
-      desc: () => $t(L.MakeWarSpeechDesc),
+   ExecuteBattlePlan: ITimedAction = {
+      name: () => $t(L.ExecuteABattlePlan),
+      desc: () => $t(L.TimedActionExecuteBattlePlanDesc$1, "1"),
       duration: 0,
       cooldown: 12,
+   };
+   MakeWarSpeech: ITimedAction = {
+      name: () => $t(L.MakeWarSpeech),
+      desc: () => $t(L.MakeWarSpeechDesc$1$2, "10%", "1"),
+      duration: 0,
+      cooldown: 24,
    };
    GrantTaxRelief: ITimedEffectAction = {
       name: () => $t(L.GrantTaxRelief),
@@ -149,6 +156,17 @@ class TimedActionDefinitions {
    MakeCore: ITimedAction = {
       name: () => $t(L.MakeCore),
       desc: () => $t(L.MadeCoreTileRemainsCoreAfterReconquest),
+      duration: 0,
+      cooldown: 12,
+   };
+   AdjustAutonomy: ITimedAction = {
+      name: () => $t(L.AdjustAutonomy),
+      desc: () => $t(L.TimedActionAdjustAutonomyDesc$1$2$3$4, "1%", "1%", "1", "0.5%"),
+      duration: 0,
+      cooldown: 6,
+   };
+   AdjustArmyComposition: ITimedAction = {
+      name: () => $t(L.AdjustArmyComposition),
       duration: 0,
       cooldown: 12,
    };
@@ -478,7 +496,7 @@ class TimedActionDefinitions {
    };
    DecimateOurArmy: ITimedAction = {
       name: () => $t(L.DecimateOurArmy),
-      desc: () => $t(L.DecimatingOurArmyReducesOurStandingArmyBy$1AndGrantsUs$2WarScore, "10%", "1"),
+      desc: () => $t(L.DecimateOurArmyDesc$1$2$3, "10%", "10%", "1"),
       duration: 0,
       cooldown: 24,
    };
@@ -490,7 +508,7 @@ class TimedActionDefinitions {
    };
    ForceAttack: ITimedAction = {
       name: () => $t(L.LaunchForcefulAttack),
-      desc: () => $t(L.TimedActionForceAttackDesc$1$2, "10%", "1"),
+      desc: () => $t(L.TimedActionForceAttackDesc$1$2, "5%", "1"),
       duration: 12,
       cooldown: 24,
    };

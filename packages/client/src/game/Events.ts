@@ -23,6 +23,7 @@ export const ShowModal = new TypedEvent<ShowModalEvent>();
 export const UpdateSidebar = new TypedEvent<ReactElement>();
 export const ToggleSidebar = new TypedEvent<boolean>();
 export const CloseModal = new TypedEvent<void>();
+export const CloseModalImmediately = new TypedEvent<void>();
 export const OnKeydown = new TypedEvent<KeyboardEvent>();
 export const OnKeyup = new TypedEvent<KeyboardEvent>();
 export const CurrentShortcuts = new Map<Shortcut, (event: KeyboardEvent) => void>();

@@ -20,6 +20,7 @@ import { MapGrid } from "../MapGrid";
 import { cacheTile, cacheTileEvaluation, isConnectedToCapital } from "./CacheLogic";
 import { defineValueGetter, type EvaluationMode, ValueCalculation } from "./Calculation";
 import { EcumenicalCouncilPct } from "./EcumenicalCouncilLogic";
+import { getCulturalCohesion } from "./InternalAffairsLogic";
 import { tileIsOurCoreCondition } from "./MissionLogic";
 import {
    attachModifiers,
@@ -28,7 +29,6 @@ import {
    attachTileModifiersToCalculation,
 } from "./ModifierLogic";
 import {
-   getCulturalCohesion,
    getNeighborProvinces,
    getProvinceName,
    getProvinceOverextension,
@@ -64,8 +64,14 @@ export function getTileGoverningCost(tile: Tile, save: SaveGame): IValueBreakdow
       value: data.infrastructure + data.production + data.population,
    });
    attachTileModifiers(data.modifiers.GoverningCapacity, breakdown);
+   if (data.autonomy > 0) {
+      breakdown.multiply.push({ name: $t(L.Autonomy), value: -data.autonomy * 0.005 });
+   }
    if (data.buildings.has("Courthouse")) {
       breakdown.multiply.push({ name: Buildings.Courthouse.name(), value: -0.2 });
+   }
+   if (data.buildings.has("Basilica")) {
+      breakdown.multiply.push({ name: Buildings.Basilica.name(), value: -0.4 });
    }
    if (
       hasProvinceUpgrade("CoastalAdministration", data.province, save) &&
@@ -92,8 +98,8 @@ export function getTileGoverningCost(tile: Tile, save: SaveGame): IValueBreakdow
    const distanceFromCapital = getDistanceFromCapital(tile, save);
    breakdown.multiply.push({
       name: $t(L.DistanceFromCapital),
-      desc: $t(L.$1TilesFromCapital$2PerTile, formatNumber(distanceFromCapital), "10%"),
-      value: distanceFromCapital * 0.1,
+      desc: $t(L.$1TilesFromCapital$2PerTile, formatNumber(distanceFromCapital), "5%"),
+      value: distanceFromCapital * 0.05,
    });
    if (isCapital(tile, save)) {
       breakdown.multiply.push({ name: $t(L.IsCurrentCapital), value: -0.9 });
@@ -199,6 +205,9 @@ export function _getTileDefense(tile: Tile, save: SaveGame): IValueBreakdown {
    });
    attachTileModifiers(data.modifiers.Defense, breakdown);
    attachModifiers("Defense", breakdown, data.province, save);
+   if (data.autonomy > 0) {
+      breakdown.multiply.push({ name: $t(L.Autonomy), value: -data.autonomy * 0.005 });
+   }
    if (data.buildings.has("Castra")) {
       breakdown.multiply.push({ name: Buildings.Castra.name(), value: 0.2 });
    }

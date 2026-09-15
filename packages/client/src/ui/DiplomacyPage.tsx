@@ -37,6 +37,7 @@ import { TimedActions } from "../game/definitions/TimedAction";
 import { GameStateUpdated } from "../game/Events";
 import type { SaveGame } from "../game/GameState";
 import { showError } from "../game/logic/AlertLogic";
+import { getWarPower } from "../game/logic/ArmyLogic";
 import {
    getAnnexCostDiscount,
    getAttitudeTowards,
@@ -54,7 +55,7 @@ import {
    RivalAttitudeDuration,
    RivalAttitudeModifier,
 } from "../game/logic/DiplomacyLogic";
-import { getProvinceName, getProvincePrestige, getProvinceTileCount, getWarPower } from "../game/logic/ProvinceLogic";
+import { getProvinceName, getProvincePrestige, getProvinceTileCount } from "../game/logic/ProvinceLogic";
 import { TimedActionDescComp } from "../game/logic/TimedActionDescComp";
 import { getTimedActionCooldownLeft, getTimedActionTimeLeft } from "../game/logic/TimedActionLogic";
 import { getAllies, getClients, getDefensePacts, getPatrons } from "../game/logic/TreatyLogic";
@@ -79,6 +80,7 @@ import { TradeSingletonModal } from "./TradeSingletonModal";
 import { TreatyActionButton } from "./TreatyActionButton";
 import { DiplomacyActionWidth, DiplomacyWidth, SidebarWidth } from "./UIConstant";
 import { WarModal } from "./WarModal";
+import { WarPowerRow } from "./WarPowerTooltip";
 import { WarTooltip } from "./WarTooltip";
 
 export function DiplomacyPage({ province }: { province: Province }): React.ReactNode {
@@ -128,12 +130,7 @@ export function DiplomacyPage({ province }: { province: Province }): React.React
                   <div className="f1">{$t(L.Religion)}</div>
                   <div>{Religion[theirState.religion].name()}</div>
                </div>
-               <BreakdownRow
-                  className="mx10 my5"
-                  name={$t(L.WarPower)}
-                  breakdown={getWarPower(province, G.save)}
-                  formatFunc={formatNumber}
-               />
+               <WarPowerRow className="mx10 my5" name={$t(L.WarPower)} breakdown={getWarPower({}, province, G.save)} />
                <div className="row my5 mx10">
                   <div className="f1">{$t(L.Prestige)}</div>
                   <div>{formatNumber(getProvincePrestige(province, G.save).value)}</div>

@@ -2,6 +2,7 @@ import type { Tile } from "@project/shared/src/utils/Helper";
 import Amphitheatre from "../../assets/images/buildings/Amphitheatre.webp";
 import ArmyCamp from "../../assets/images/buildings/ArmyCamp.webp";
 import Barracks from "../../assets/images/buildings/Barracks.webp";
+import Basilica from "../../assets/images/buildings/Basilica.webp";
 import Castra from "../../assets/images/buildings/Castra.webp";
 import CircusMaximus from "../../assets/images/buildings/CircusMaximus.webp";
 import Citadel from "../../assets/images/buildings/Citadel.webp";
@@ -173,6 +174,19 @@ export const _Buildings = {
       conditions: () => [],
       imageCredit: "Sacrifice In Front Of A Roman Temple, Vinzenz Fischer (1791)",
    },
+   Workshop: {
+      name: () => $t(L.BuildingWorkshop),
+      desc: () => $t(L.$1ProductionCapacity, "+1"),
+      image: Workshop,
+      construction: {
+         gold: 100,
+      },
+      maintenance: {
+         gold: 0.5,
+      },
+      conditions: () => [],
+      imageCredit: "A Forge (18th century), Antonio Zucchi (Italian, 1726-1796)",
+   },
    Courthouse: {
       name: () => $t(L.BuildingCourthouse),
       desc: () => $t(L.$1TileGoverningCost, "-20%"),
@@ -186,18 +200,18 @@ export const _Buildings = {
       conditions: () => [],
       imageCredit: "Forum Nervae, Forum Augusti, Christoph Ziegler (1882)  ",
    },
-   Workshop: {
-      name: () => $t(L.BuildingWorkshop),
-      desc: () => $t(L.$1ProductionCapacity, "+1"),
-      image: Workshop,
+   Basilica: {
+      name: () => $t(L.BuildingBasilica),
+      desc: () => $t(L.$1TileGoverningCost, "-40%"),
+      image: Basilica,
       construction: {
-         gold: 100,
+         gold: 400,
       },
       maintenance: {
-         gold: 0.5,
+         gold: 2,
       },
       conditions: () => [],
-      imageCredit: "A Forge (18th century), Antonio Zucchi (Italian, 1726-1796)",
+      imageCredit: "Reconstruction of Basilica Ulpia in Rome, Julien Guadet (1867)",
    },
    Harbour: {
       name: () => $t(L.BuildingHarbour),

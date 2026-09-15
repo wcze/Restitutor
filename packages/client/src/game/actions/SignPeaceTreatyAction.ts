@@ -9,14 +9,26 @@ import type { Province } from "../definitions/Province";
 import { hasProvinceUpgrade, ProvinceUpgrades } from "../definitions/ProvinceUpgrades";
 import { RefreshTiles } from "../Events";
 import type { SaveGame } from "../GameState";
+import { getCurrentGeneral } from "../logic/ArmyLogic";
 import { getRelation } from "../logic/DiplomacyLogic";
 import { addModifier } from "../logic/ModifierLogic";
-import { addProvinceResource, addProvinceStat, ensureProvinceCapitals } from "../logic/ProvinceLogic";
+import {
+   applyPeaceTreatyOption,
+   getAvailablePeaceTreatyOptions,
+   type PeaceTreatyOption,
+} from "../logic/PeaceTreatyLogic";
+import { addProvinceStat, ensureProvinceCapitals } from "../logic/ProvinceLogic";
+import { addProvinceResource } from "../logic/ResourceLogic";
 import { showGameEventModal } from "../logic/TickProvince";
-import { getCurrentGeneral, getTruceDuration, type IWar, isEligibleForMandate, WarFlag } from "../logic/WarLogic";
+import { getPlunderedUpgrade, getTruceDuration, type IWar, isEligibleForMandate, WarFlag } from "../logic/WarLogic";
 import { finalizeCondition, type IGameAction } from "./GameAction";
 
-export function SignPeaceTreatyAction(war: IWar, province: Province, save: SaveGame): IGameAction {
+export function SignPeaceTreatyAction(
+   war: IWar,
+   province: Province,
+   option: PeaceTreatyOption,
+   save: SaveGame,
+): IGameAction {
    return {
       condition: finalizeCondition([
          {
@@ -27,6 +39,10 @@ export function SignPeaceTreatyAction(war: IWar, province: Province, save: SaveG
             name: $t(L.WeHaveWonTheWar),
             value: save.state.wars.includes(war) && war.actualWarScore >= war.requiredWarScore,
          },
+         {
+            name: $t(L.AdditionalPeaceTreatyTerm),
+            value: getAvailablePeaceTreatyOptions(war, save).includes(option),
+         },
       ]),
       execute: ({ headless }) => {
          if (isEligibleForMandate(war, save)) {
@@ -36,10 +52,23 @@ export function SignPeaceTreatyAction(war: IWar, province: Province, save: SaveG
             const data = save.state.tiles.get(tile);
             if (data) {
                data.province = war.attacker;
-               if (hasFlag(war.flag, WarFlag.Plunder)) {
-                  data.infrastructure = Math.max(1, data.infrastructure - 1);
-                  data.production = Math.max(1, data.production - 1);
-                  data.population = Math.max(1, data.population - 1);
+            }
+         }
+         applyPeaceTreatyOption(option, war, save);
+         let reduction = 0;
+         if (option === "Devastation") {
+            reduction += 0.1;
+         }
+         if (hasFlag(war.flag, WarFlag.Plunder)) {
+            reduction += 0.2;
+         }
+         if (reduction > 0) {
+            for (const tile of war.tiles) {
+               const data = save.state.tiles.get(tile);
+               if (data) {
+                  data.infrastructure -= getPlunderedUpgrade(data.infrastructure, reduction);
+                  data.production -= getPlunderedUpgrade(data.production, reduction);
+                  data.population -= getPlunderedUpgrade(data.population, reduction);
                }
             }
          }
@@ -110,7 +139,7 @@ export function SignPeaceTreatyAction(war: IWar, province: Province, save: SaveG
          RefreshTiles.emit({ tiles: [...war.tiles, ...changedCapitals], options: { indicator: true, visual: true } });
          if (headless) {
             if (war.defender === save.state.playerProvince) {
-               showGameEventModal(InvaderConqueredWarGoalModal, { war });
+               showGameEventModal(InvaderConqueredWarGoalModal, { war, peaceTreatyOption: option });
             }
             if (war.coAttackers.has(save.state.playerProvince) || war.coDefenders.has(save.state.playerProvince)) {
                showGameEventModal(WarEndedModal, { war });

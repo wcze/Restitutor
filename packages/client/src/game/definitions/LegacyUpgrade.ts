@@ -58,6 +58,13 @@ export class LegacyUpgradeDefinitions {
          AdministrativePoint: { type: "add", value: 1 },
       },
    } as const;
+   Administrative7: ILegacyUpgradeModifier = {
+      requires: ["Administrative6"],
+      position: [0, 6],
+      modifiers: {
+         AdministrativePoint: { type: "add", value: 1 },
+      },
+   } as const;
    Diplomatic1: ILegacyUpgradeModifier = {
       requires: ["Administrative1"],
       position: [1, 0],
@@ -171,9 +178,23 @@ export class LegacyUpgradeDefinitions {
          GoverningCapacity: { type: "add", value: 100 },
       },
    } as const;
+   GoverningCapacity5: ILegacyUpgradeModifier = {
+      requires: ["GoverningCapacity4"],
+      position: [1, 6],
+      modifiers: {
+         GoverningCapacity: { type: "add", value: 100 },
+      },
+   } as const;
    MakeCore1: ILegacyUpgradeModifier = {
       requires: ["InfrastructureUpgrade1"],
       position: [3, 4],
+      modifiers: {
+         MakeCoreCost: { type: "multiply", value: -0.1 },
+      },
+   } as const;
+   MakeCore2: ILegacyUpgradeModifier = {
+      requires: ["MakeCore1"],
+      position: [3, 5],
       modifiers: {
          MakeCoreCost: { type: "multiply", value: -0.1 },
       },
@@ -188,6 +209,13 @@ export class LegacyUpgradeDefinitions {
    Defense2: ILegacyUpgradeModifier = {
       requires: ["Defense1"],
       position: [2, 5],
+      modifiers: {
+         Defense: { type: "multiply", value: 0.1 },
+      },
+   } as const;
+   Defense3: ILegacyUpgradeModifier = {
+      requires: ["Defense2"],
+      position: [2, 6],
       modifiers: {
          Defense: { type: "multiply", value: 0.1 },
       },
@@ -413,9 +441,23 @@ export class LegacyUpgradeDefinitions {
          LandTax: { type: "multiply", value: 0.1 },
       },
    } as const;
+   LandTax4: ILegacyUpgradeModifier = {
+      requires: ["LandTax3"],
+      position: [-2, 6],
+      modifiers: {
+         LandTax: { type: "multiply", value: 0.1 },
+      },
+   } as const;
    AdvisorCost1: ILegacyUpgradeModifier = {
       requires: ["LandTax1"],
       position: [-3, 4],
+      modifiers: {
+         AdvisorCost: { type: "multiply", value: -0.1 },
+      },
+   } as const;
+   AdvisorCost2: ILegacyUpgradeModifier = {
+      requires: ["AdvisorCost1"],
+      position: [-3, 5],
       modifiers: {
          AdvisorCost: { type: "multiply", value: -0.1 },
       },
@@ -497,6 +539,13 @@ export class LegacyUpgradeDefinitions {
          Stability: { type: "add", value: 10 },
       },
    } as const;
+   Stability5: ILegacyUpgradeModifier = {
+      requires: ["Stability4"],
+      position: [-1, 6],
+      modifiers: {
+         Stability: { type: "add", value: 10 },
+      },
+   } as const;
    ProductionCapacity1: ILegacyUpgradeModifier = {
       requires: ["Administrative1"],
       position: [0, -1],
@@ -543,63 +592,63 @@ export class LegacyUpgradeDefinitions {
       requires: ["ArmyMaintenance1"],
       position: [-3, 1],
       modifiers: {
-         InfantryUnitPower: { type: "add", value: 1 },
+         InfantryUnitPower: { type: "multiply", value: 0.5 },
       },
    } as const;
    InfantryUnitPower2: ILegacyUpgradeModifier = {
       requires: ["InfantryUnitPower1"],
       position: [-4, 1],
       modifiers: {
-         InfantryUnitPower: { type: "add", value: 1 },
+         InfantryUnitPower: { type: "multiply", value: 0.5 },
       },
    } as const;
    InfantryUnitPower3: ILegacyUpgradeModifier = {
       requires: ["InfantryUnitPower2"],
       position: [-5, 1],
       modifiers: {
-         InfantryUnitPower: { type: "add", value: 1 },
+         InfantryUnitPower: { type: "multiply", value: 0.5 },
       },
    } as const;
    RangedUnitPower1: ILegacyUpgradeModifier = {
       requires: ["ArmyMaintenance1"],
       position: [-3, 2],
       modifiers: {
-         RangedUnitPower: { type: "add", value: 1 },
+         RangedUnitPower: { type: "multiply", value: 0.5 },
       },
    } as const;
    RangedUnitPower2: ILegacyUpgradeModifier = {
       requires: ["RangedUnitPower1"],
       position: [-4, 2],
       modifiers: {
-         RangedUnitPower: { type: "add", value: 1 },
+         RangedUnitPower: { type: "multiply", value: 0.5 },
       },
    } as const;
    RangedUnitPower3: ILegacyUpgradeModifier = {
       requires: ["RangedUnitPower2"],
       position: [-5, 2],
       modifiers: {
-         RangedUnitPower: { type: "add", value: 1 },
+         RangedUnitPower: { type: "multiply", value: 0.5 },
       },
    } as const;
    CavalryUnitPower1: ILegacyUpgradeModifier = {
       requires: ["PopulationUpgrade1"],
       position: [-3, -1],
       modifiers: {
-         CavalryUnitPower: { type: "add", value: 1 },
+         CavalryUnitPower: { type: "multiply", value: 0.5 },
       },
    } as const;
    CavalryUnitPower2: ILegacyUpgradeModifier = {
       requires: ["CavalryUnitPower1"],
       position: [-4, -1],
       modifiers: {
-         CavalryUnitPower: { type: "add", value: 1 },
+         CavalryUnitPower: { type: "multiply", value: 0.5 },
       },
    } as const;
    CavalryUnitPower3: ILegacyUpgradeModifier = {
       requires: ["CavalryUnitPower2"],
       position: [-5, -1],
       modifiers: {
-         CavalryUnitPower: { type: "add", value: 1 },
+         CavalryUnitPower: { type: "multiply", value: 0.5 },
       },
    } as const;
    WarScore1: ILegacyUpgradeModifier = {

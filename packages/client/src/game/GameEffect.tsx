@@ -39,13 +39,9 @@ import { filterProvinces } from "./events/GameEventLogic";
 import type { SaveGame } from "./GameState";
 import { addAttitudeModifier, getRelation } from "./logic/DiplomacyLogic";
 import { addModifier } from "./logic/ModifierLogic";
-import {
-   addProvinceResource,
-   addProvinceStat,
-   generateTrade,
-   getProvinceName,
-   spawnProvince,
-} from "./logic/ProvinceLogic";
+import { addProvinceStat, getProvinceName, spawnProvince } from "./logic/ProvinceLogic";
+import { addProvinceResource } from "./logic/ResourceLogic";
+import { generateTrade } from "./logic/TradeLogic";
 
 export interface IGameEffect {
    resources?: Partial<Record<ProvinceResource, number>>;
@@ -98,7 +94,7 @@ export function getGameEffectDesc(effect: IGameEffect, province: Province, save:
          {effect.modifiers &&
             mapOf(effect.modifiers, (modifier, data) => <div key={modifier}>{modifierToString(modifier, data)}</div>)}
          {effect.provinceModifiers?.map((modifier) => (
-            <div key={modifier.modifier}>
+            <div key={`${modifier.province}-${modifier.modifier}`}>
                {getProvinceName(modifier.province, save)}: {modifierToString(modifier.modifier, modifier)}
             </div>
          ))}

@@ -1,5 +1,13 @@
-import { Slider } from "@mantine/core";
-import { cls, formatNumber, formatPercent, formatPercentDelta } from "@project/shared/src/utils/Helper";
+import { Checkbox, Slider } from "@mantine/core";
+import {
+   cls,
+   formatNumber,
+   formatPercent,
+   formatPercentDelta,
+   hasFlag,
+   setFlag,
+} from "@project/shared/src/utils/Helper";
+import { useState } from "react";
 import {
    MakeGovernorGeneralAction,
    RecruitGeneralAction,
@@ -9,50 +17,59 @@ import { finalizeCondition } from "../game/actions/GameAction";
 import { durationToString } from "../game/definitions/Modifier";
 import { ProvinceResourceNames, ProvinceStatNames } from "../game/definitions/Province";
 import { TimedActions } from "../game/definitions/TimedAction";
-import { GameStateUpdated } from "../game/Events";
+import { GameOptionUpdated, GameStateUpdated } from "../game/Events";
+import { GameOptionFlag } from "../game/GameOption";
 import {
-   GeneralArmyMaintenancePct,
-   getArmyMaintenanceCost,
-   getProvinceManpower,
-   getProvinceResource,
-   getProvinceStat,
-   getWarPower,
-   provinceResourceOf,
-   setProvinceStat,
-} from "../game/logic/ProvinceLogic";
-import { TimedActionDescComp } from "../game/logic/TimedActionDescComp";
-import { getTimedActionTimeLeft } from "../game/logic/TimedActionLogic";
-import {
+   ArmyCounterBonus,
    ArmyMoraleMonthlyIncrease,
    dismissGeneral,
-   getCavalryUnitWarPower,
+   GeneralArmyMaintenancePct,
+   getArmyComposition,
+   getArmyMaintenanceCost,
    getCurrentGeneral,
-   getInfantryUnitWarPower,
-   getRangedUnitWarPower,
+   getProvinceManpower,
+   getUnitWarPower,
+   getWarPower,
    hasGeneralCondition,
    MaxArmyMaintenance,
    MaxConscription,
    MinArmyMaintenance,
    MinConscription,
+   setArmyComposition,
    setProvinceArmyMaintenance,
    setProvinceTargetConscription,
-} from "../game/logic/WarLogic";
+   UnitPowerUpgradeBonus,
+} from "../game/logic/ArmyLogic";
+import { getProvinceStat } from "../game/logic/ProvinceLogic";
+import { getProvinceResource, provinceResourceOf } from "../game/logic/ResourceLogic";
+import { TimedActionDescComp } from "../game/logic/TimedActionDescComp";
+import { getTimedActionTimeLeft, timedActionConditions } from "../game/logic/TimedActionLogic";
 import { G } from "../utils/Global";
 import { refreshOnTypedEvent } from "../utils/Hook";
 import { $t, L } from "../utils/i18n";
-import { ModalComp, ModalTitleBar } from "../utils/ModalManager";
+import { hideModal, ModalComp, ModalTitleBar } from "../utils/ModalManager";
 import { ActionButton } from "./ActionButton";
 import { BreakdownRow } from "./BreakdownRow";
+import { ConfirmModal } from "./ConfirmModal";
+import { showPanel } from "./common/ShowPanel";
 import { FloatingTip } from "./components/FloatingTip";
 import { html } from "./components/RenderHTMLComp";
 import { ProvinceResourceImages } from "./ProvinceResourceImages";
 import { TimedActionButton } from "./TimedActionButton";
 import { Grid3 } from "./UIConstant";
+import { WarPowerRow } from "./WarPowerTooltip";
 
 export function ArmySingletonModal(): React.ReactNode {
    refreshOnTypedEvent(GameStateUpdated);
+   const [draft, setDraft] = useState<{
+      ranged: number;
+      cavalry: number;
+   }>();
+   const { ranged, cavalry } = draft ?? getArmyComposition(G.save.state.playerProvince, G.save);
+   const infantry = 100 - ranged - cavalry;
    const manpower = getProvinceManpower(G.save.state.playerProvince, G.save);
-   const maintenanceCost = getArmyMaintenanceCost(G.save.state.playerProvince, G.save);
+   const composition = { infantry, ranged, cavalry };
+   const maintenanceCost = getArmyMaintenanceCost({ composition }, G.save.state.playerProvince, G.save);
    const actualConscription = getProvinceStat("actualConscription", G.save.state.playerProvince, G.save);
    const targetConscription = getProvinceStat("targetConscription", G.save.state.playerProvince, G.save);
    const armyMorale = getProvinceStat("armyMorale", G.save.state.playerProvince, G.save);
@@ -64,28 +81,7 @@ export function ArmySingletonModal(): React.ReactNode {
          <div className="mx10 my5" id="ArmyModal_TargetConscription">
             {$t(L.TargetConscription)}
          </div>
-         <Slider
-            className="m10"
-            value={targetConscription}
-            onChange={(value) => {
-               setProvinceTargetConscription(value, G.save.state.playerProvince, G.save);
-               GameStateUpdated.emit();
-            }}
-            min={MinConscription}
-            max={MaxConscription}
-            marks={[
-               { value: 5, label: "5%" },
-               { value: 10, label: "10%" },
-               { value: 15, label: "15%" },
-               { value: 20, label: "20%" },
-               { value: 25, label: "25%" },
-               { value: 30, label: "30%" },
-               { value: 35, label: "35%" },
-               { value: 40, label: "40%" },
-               { value: 45, label: "45%" },
-               { value: 50, label: "50%" },
-            ]}
-         />
+         <TargetConscriptionSlider />
          <div className="h20" />
          <div className="divider" />
          <div className="row g5 mx10 my5">
@@ -118,31 +114,91 @@ export function ArmySingletonModal(): React.ReactNode {
                </>
             )}
          </div>
-         <div className="h1">{$t(L.ArmyComposition)}</div>
+         <div className="h1 row g5">
+            <div className="f1">{$t(L.ArmyComposition)}</div>
+            {draft ? (
+               <>
+                  <ActionButton
+                     className="text-sm"
+                     action={() => {
+                        const current = getArmyComposition(G.save.state.playerProvince, G.save);
+                        return {
+                           condition: finalizeCondition([
+                              ...timedActionConditions(
+                                 { action: "AdjustArmyComposition" },
+                                 G.save.state.playerProvince,
+                                 G.save,
+                              ),
+                              {
+                                 name: $t(L.ArmyCompositionHasChanged),
+                                 value: draft.ranged !== current.ranged || draft.cavalry !== current.cavalry,
+                              },
+                           ]),
+                           execute: () => {
+                              setArmyComposition(draft.ranged, draft.cavalry, G.save.state.playerProvince, G.save);
+                              setDraft(undefined);
+                           },
+                        };
+                     }}
+                  >
+                     {$t(L.Apply)}
+                  </ActionButton>
+                  <button className="btn text-sm" onClick={() => setDraft(undefined)}>
+                     {$t(L.Cancel)}
+                  </button>
+               </>
+            ) : (
+               <ActionButton
+                  className="text-sm"
+                  action={() => ({
+                     condition: finalizeCondition(
+                        timedActionConditions({ action: "AdjustArmyComposition" }, G.save.state.playerProvince, G.save),
+                     ),
+                     execute: () => setDraft(getArmyComposition(G.save.state.playerProvince, G.save)),
+                  })}
+               >
+                  <div className="row g5">
+                     <div className="mi xs">tune</div>
+                     <div>{$t(L.Adjust)}</div>
+                  </div>
+               </ActionButton>
+            )}
+         </div>
          <div className="row g0 my5 text-sm">
             <div className="f1">
                <div className="mx10 my5 row">
                   <div className="f1">{$t(L.Infantry)}</div>
-                  <div>
-                     {100 -
-                        getProvinceStat("cavalryUnit", G.save.state.playerProvince, G.save) -
-                        getProvinceStat("rangedUnit", G.save.state.playerProvince, G.save)}
-                     %
-                  </div>
+                  <div>{infantry}%</div>
                </div>
                <BreakdownRow
                   className="mx10 my5"
                   name={$t(L.UnitPower)}
-                  breakdown={getInfantryUnitWarPower(G.save.state.playerProvince, G.save)}
+                  breakdown={getUnitWarPower("infantry", G.save.state.playerProvince, G.save)}
+                  tooltip={(element) => (
+                     <>
+                        <div className="m10">
+                           {html($t(L.InfantryCountersCavalryAndIsCounteredByRangedUnits))}
+                           <div className="h5" />
+                           {html(
+                              $t(L.InfantryEffectivenessIncreaseDesc$1$2, "1%", formatPercent(0.01 * ArmyCounterBonus)),
+                           )}
+                           <div className="h5" />
+                           {html(
+                              $t(L.InfantryEffectivenessDecreaseDesc$1$2, "1%", formatPercent(0.01 * ArmyCounterBonus)),
+                           )}
+                        </div>
+                        {element}
+                     </>
+                  )}
                />
                <div className="mx10 my5">
                   <Slider
                      styles={{ thumb: { display: "none" } }}
-                     value={
-                        100 -
-                        getProvinceStat("cavalryUnit", G.save.state.playerProvince, G.save) -
-                        getProvinceStat("rangedUnit", G.save.state.playerProvince, G.save)
-                     }
+                     value={infantry}
+                     disabled
+                     min={0}
+                     max={100}
+                     step={1}
                   />
                </div>
             </div>
@@ -150,23 +206,41 @@ export function ArmySingletonModal(): React.ReactNode {
             <div className="f1">
                <div className="mx10 my5 row">
                   <div className="f1">{$t(L.Ranged)}</div>
-                  <div>{getProvinceStat("rangedUnit", G.save.state.playerProvince, G.save)}%</div>
+                  <div>{ranged}%</div>
                </div>
                <BreakdownRow
                   className="mx10 my5"
                   name={$t(L.UnitPower)}
-                  breakdown={getRangedUnitWarPower(G.save.state.playerProvince, G.save)}
+                  breakdown={getUnitWarPower("ranged", G.save.state.playerProvince, G.save)}
+                  tooltip={(element) => (
+                     <>
+                        <div className="m10">
+                           {html($t(L.RangedUnitsCounterInfantryAndAreCounteredByCavalry))}
+                           <div className="h5" />
+                           {html(
+                              $t(L.RangedEffectivenessIncreaseDesc$1$2, "1%", formatPercent(0.01 * ArmyCounterBonus)),
+                           )}
+                           <div className="h5" />
+                           {html(
+                              $t(L.RangedEffectivenessDecreaseDesc$1$2, "1%", formatPercent(0.01 * ArmyCounterBonus)),
+                           )}
+                        </div>
+                        {element}
+                     </>
+                  )}
                />
                <div className="mx10 my5">
                   <Slider
                      min={0}
-                     max={25}
+                     max={100}
                      step={1}
-                     value={getProvinceStat("rangedUnit", G.save.state.playerProvince, G.save)}
-                     onChange={(value) => {
-                        setProvinceStat("rangedUnit", value, G.save.state.playerProvince, G.save);
-                        GameStateUpdated.emit();
-                     }}
+                     value={ranged}
+                     disabled={!draft}
+                     onChange={(value) =>
+                        setDraft((current) =>
+                           current ? { ranged: value, cavalry: Math.min(current.cavalry, 100 - value) } : current,
+                        )
+                     }
                   />
                </div>
             </div>
@@ -174,23 +248,41 @@ export function ArmySingletonModal(): React.ReactNode {
             <div className="f1">
                <div className="mx10 my5 row">
                   <div className="f1">{$t(L.Cavalry)}</div>
-                  <div>{getProvinceStat("cavalryUnit", G.save.state.playerProvince, G.save)}%</div>
+                  <div>{cavalry}%</div>
                </div>
                <BreakdownRow
                   className="mx10 my5"
                   name={$t(L.UnitPower)}
-                  breakdown={getCavalryUnitWarPower(G.save.state.playerProvince, G.save)}
+                  breakdown={getUnitWarPower("cavalry", G.save.state.playerProvince, G.save)}
+                  tooltip={(element) => (
+                     <>
+                        <div className="m10">
+                           {html($t(L.CavalryCountersRangedUnitsAndIsCounteredByInfantry))}
+                           <div className="h5" />
+                           {html(
+                              $t(L.CavalryEffectivenessIncreaseDesc$1$2, "1%", formatPercent(0.01 * ArmyCounterBonus)),
+                           )}
+                           <div className="h5" />
+                           {html(
+                              $t(L.CavalryEffectivenessDecreaseDesc$1$2, "1%", formatPercent(0.01 * ArmyCounterBonus)),
+                           )}
+                        </div>
+                        {element}
+                     </>
+                  )}
                />
                <div className="mx10 my5">
                   <Slider
                      min={0}
-                     max={25}
+                     max={100}
                      step={1}
-                     value={getProvinceStat("cavalryUnit", G.save.state.playerProvince, G.save)}
-                     onChange={(value) => {
-                        setProvinceStat("cavalryUnit", value, G.save.state.playerProvince, G.save);
-                        GameStateUpdated.emit();
-                     }}
+                     value={cavalry}
+                     disabled={!draft}
+                     onChange={(value) =>
+                        setDraft((current) =>
+                           current ? { cavalry: value, ranged: Math.min(current.ranged, 100 - value) } : current,
+                        )
+                     }
                   />
                </div>
             </div>
@@ -280,24 +372,7 @@ export function ArmySingletonModal(): React.ReactNode {
          <div className="mx10 my5" id="ArmyModal_ArmyMaintenance">
             {$t(L.ArmyMaintenance)}
          </div>
-         <Slider
-            className="m10"
-            value={armyMaintenance}
-            onChange={(value) => {
-               setProvinceArmyMaintenance(value, G.save.state.playerProvince, G.save);
-               GameStateUpdated.emit();
-            }}
-            min={MinArmyMaintenance}
-            max={MaxArmyMaintenance}
-            marks={[
-               { value: 50, label: "50%" },
-               { value: 60, label: "60%" },
-               { value: 70, label: "70%" },
-               { value: 80, label: "80%" },
-               { value: 90, label: "90%" },
-               { value: 100, label: "100%" },
-            ]}
-         />
+         <ArmyMaintenanceSlider />
          <div className="h20" />
          <div className="divider" />
          <div className="row mx10 my5">
@@ -318,12 +393,224 @@ export function ArmySingletonModal(): React.ReactNode {
          </div>
          <div className="h1">{$t(L.MonthlyCostAndWarPower)}</div>
          <BreakdownRow className="mx10 my5" name={$t(L.MonthlyGoldCost)} breakdown={maintenanceCost} />
-         <BreakdownRow
+         <WarPowerRow
             className="mx10 my5 text-display text-lg"
             name={$t(L.WarPower)}
-            breakdown={getWarPower(G.save.state.playerProvince, G.save)}
+            breakdown={getWarPower({ composition }, G.save.state.playerProvince, G.save)}
          />
       </ModalComp>
+   );
+}
+
+function TargetConscriptionSlider(): React.ReactNode {
+   const [preview, setPreview] = useState<number>();
+   const currentValue = getProvinceStat("targetConscription", G.save.state.playerProvince, G.save);
+   return (
+      <Slider
+         className="m10"
+         value={preview ?? currentValue}
+         onChange={setPreview}
+         onChangeEnd={(value) => {
+            const save = G.save;
+            const province = save.state.playerProvince;
+            const previousValue = getProvinceStat("targetConscription", province, save);
+            if (value === previousValue) {
+               setPreview(undefined);
+               return;
+            }
+            const apply = () => {
+               setPreview(undefined);
+               if (G.save !== save || G.save.state.playerProvince !== province) {
+                  return;
+               }
+               setProvinceTargetConscription(value, province, save);
+               GameStateUpdated.emit();
+            };
+            if (
+               value < previousValue &&
+               value < getProvinceStat("actualConscription", province, save) &&
+               !hasFlag(save.options.flag, GameOptionFlag.SkipConscriptionReductionConfirmation)
+            ) {
+               let skipConfirmation = false;
+               showPanel(ConfirmModal, {
+                  title: $t(L.LowerTargetConscription),
+                  message: (
+                     <>
+                        <div className="box red">
+                           <div className="row mx10 my5 g5">
+                              <div>{$t(L.TargetConscription)}</div>
+                              <div className="f1" />
+                              <div>{formatPercent(previousValue / 100)}</div>
+                              <div className="mi sm text-red">arrow_right_alt</div>
+                              <div>{formatPercent(value / 100)}</div>
+                           </div>
+                           <div className="row mx10 my5 g5">
+                              <div>{$t(L.ActualConscription)}</div>
+                              <div className="f1" />
+                              <div>{formatPercent(getProvinceStat("actualConscription", province, save) / 100)}</div>
+                              <div className="mi sm text-red">arrow_right_alt</div>
+                              <div>{formatPercent(value / 100)}</div>
+                           </div>
+                        </div>
+                        <div className="mt10 text-sm text-dimmed">
+                           {html(
+                              $t(
+                                 L.ConscriptionReductionWarning$1$2$2,
+                                 formatPercent(previousValue / 100),
+                                 formatPercent(value / 100),
+                              ),
+                           )}
+                        </div>
+                        <Checkbox
+                           className="mt10"
+                           label={$t(L.DontShowThisConfirmationAgain)}
+                           defaultChecked={false}
+                           onChange={(event) => {
+                              skipConfirmation = event.currentTarget.checked;
+                           }}
+                        />
+                     </>
+                  ),
+                  onCancel: () => setPreview(undefined),
+                  confirm: {
+                     id: "ArmyModal_LowerTargetConscriptionConfirm",
+                     label: $t(L.Confirm),
+                     onClick: () => {
+                        if (G.save === save && G.save.state.playerProvince === province && skipConfirmation) {
+                           save.options.flag = setFlag(
+                              save.options.flag,
+                              GameOptionFlag.SkipConscriptionReductionConfirmation,
+                           );
+                           GameOptionUpdated.emit();
+                        }
+                        apply();
+                        hideModal();
+                     },
+                  },
+               });
+               return;
+            }
+            apply();
+         }}
+         min={MinConscription}
+         max={MaxConscription}
+         marks={[
+            { value: 5, label: "5%" },
+            { value: 10, label: "10%" },
+            { value: 15, label: "15%" },
+            { value: 20, label: "20%" },
+            { value: 25, label: "25%" },
+            { value: 30, label: "30%" },
+            { value: 35, label: "35%" },
+            { value: 40, label: "40%" },
+            { value: 45, label: "45%" },
+            { value: 50, label: "50%" },
+         ]}
+      />
+   );
+}
+
+function ArmyMaintenanceSlider(): React.ReactNode {
+   const [preview, setPreview] = useState<number>();
+   const currentValue = getProvinceStat("armyMaintenance", G.save.state.playerProvince, G.save);
+   return (
+      <Slider
+         className="m10"
+         value={preview ?? currentValue}
+         onChange={setPreview}
+         onChangeEnd={(value) => {
+            const save = G.save;
+            const province = save.state.playerProvince;
+            const previousValue = getProvinceStat("armyMaintenance", province, save);
+            if (value === previousValue) {
+               setPreview(undefined);
+               return;
+            }
+            const apply = () => {
+               setPreview(undefined);
+               if (G.save !== save || G.save.state.playerProvince !== province) {
+                  return;
+               }
+               setProvinceArmyMaintenance(value, province, save);
+               GameStateUpdated.emit();
+            };
+            if (
+               value < previousValue &&
+               value < getProvinceStat("armyMorale", province, save) &&
+               !hasFlag(save.options.flag, GameOptionFlag.SkipArmyMaintenanceReductionConfirmation)
+            ) {
+               let skipConfirmation = false;
+               showPanel(ConfirmModal, {
+                  title: $t(L.LowerArmyMaintenance),
+                  message: (
+                     <>
+                        <div className="box red">
+                           <div className="row mx10 my5 g5">
+                              <div>{$t(L.ArmyMaintenance)}</div>
+                              <div className="f1" />
+                              <div>{formatPercent(previousValue / 100)}</div>
+                              <div className="mi sm text-red">arrow_right_alt</div>
+                              <div>{formatPercent(value / 100)}</div>
+                           </div>
+                           <div className="row mx10 my5 g5">
+                              <div>{$t(L.CurrentMorale)}</div>
+                              <div className="f1" />
+                              <div>{formatPercent(getProvinceStat("armyMorale", province, save) / 100)}</div>
+                              <div className="mi sm text-red">arrow_right_alt</div>
+                              <div>{formatPercent(value / 100)}</div>
+                           </div>
+                        </div>
+                        <div className="mt10 text-sm text-dimmed">
+                           {html(
+                              $t(
+                                 L.ArmyMaintenanceReductionWarning$1$2$2,
+                                 formatPercent(previousValue / 100),
+                                 formatPercent(value / 100),
+                              ),
+                           )}
+                        </div>
+                        <Checkbox
+                           className="mt10"
+                           label={$t(L.DontShowThisConfirmationAgain)}
+                           defaultChecked={false}
+                           onChange={(event) => {
+                              skipConfirmation = event.currentTarget.checked;
+                           }}
+                        />
+                     </>
+                  ),
+                  onCancel: () => setPreview(undefined),
+                  confirm: {
+                     id: "ArmyModal_LowerArmyMaintenanceConfirm",
+                     label: $t(L.Confirm),
+                     onClick: () => {
+                        if (G.save === save && G.save.state.playerProvince === province && skipConfirmation) {
+                           save.options.flag = setFlag(
+                              save.options.flag,
+                              GameOptionFlag.SkipArmyMaintenanceReductionConfirmation,
+                           );
+                           GameOptionUpdated.emit();
+                        }
+                        apply();
+                        hideModal();
+                     },
+                  },
+               });
+               return;
+            }
+            apply();
+         }}
+         min={MinArmyMaintenance}
+         max={MaxArmyMaintenance}
+         marks={[
+            { value: 50, label: "50%" },
+            { value: 60, label: "60%" },
+            { value: 70, label: "70%" },
+            { value: 80, label: "80%" },
+            { value: 90, label: "90%" },
+            { value: 100, label: "100%" },
+         ]}
+      />
    );
 }
 
@@ -340,7 +627,7 @@ function UpgradeSkillButton({
          action={() => UpgradeGeneralSkillAction(skill, G.save.state.playerProvince, G.save)}
          tooltip={(element) => (
             <>
-               <div className="m10">{$t(L.EachGeneralSkillLevelContributesToTheCorrespondingUnitsPower)}</div>
+               <div className="m10">{$t(L.GeneralSkillBasePowerDesc$1, formatPercent(UnitPowerUpgradeBonus))}</div>
                {element}
             </>
          )}

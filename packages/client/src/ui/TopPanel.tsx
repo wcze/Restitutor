@@ -3,6 +3,7 @@ import { useCallback } from "react";
 import { Modifiers } from "../game/definitions/Modifier";
 import { ProvinceResourceNames } from "../game/definitions/Province";
 import { GameStateUpdated } from "../game/Events";
+import { getWarPower } from "../game/logic/ArmyLogic";
 import { getCurrentRelations, getDiplomats } from "../game/logic/DiplomacyLogic";
 import { MapBackgroundColors } from "../game/logic/MapColor";
 import {
@@ -13,10 +14,9 @@ import {
    getProvinceName,
    getProvinceOverextension,
    getProvincePrestige,
-   getProvinceResource,
    getProvinceStability,
-   getWarPower,
 } from "../game/logic/ProvinceLogic";
+import { getProvinceResource } from "../game/logic/ResourceLogic";
 import { useShortcut } from "../game/Shortcut";
 import { WorldScene } from "../scenes/WorldScene";
 import { G } from "../utils/Global";
@@ -48,6 +48,7 @@ import { TodoPanel } from "./TodoPanel";
 import { TopRightPanel } from "./TopRightPanel";
 import { TradeSingletonModal } from "./TradeSingletonModal";
 import { TreasuryPage } from "./TreasuryPage";
+import { WarPowerTooltip } from "./WarPowerTooltip";
 
 export function TopPanel(): React.ReactNode {
    refreshOnTypedEvent(GameStateUpdated);
@@ -101,7 +102,7 @@ export function TopLeftPanel(): React.ReactNode {
    if (!state) {
       return null;
    }
-   const warPower = getWarPower(G.save.state.playerProvince, G.save);
+   const warPower = getWarPower({}, G.save.state.playerProvince, G.save);
    const prestige = getProvincePrestige(G.save.state.playerProvince, G.save);
    const administrativePoint = getProvinceGovernmentPoint("administrative", G.save.state.playerProvince, G.save);
    const diplomaticPoint = getProvinceGovernmentPoint("diplomatic", G.save.state.playerProvince, G.save);
@@ -210,7 +211,7 @@ export function TopLeftPanel(): React.ReactNode {
                </div>
             </BreakdownTooltip>
             <div className="divider vertical" />
-            <BreakdownTooltip
+            <WarPowerTooltip
                breakdown={warPower}
                tooltip={(element) => (
                   <>
@@ -229,9 +230,9 @@ export function TopLeftPanel(): React.ReactNode {
                >
                   <img src={IconCatalog.Army} style={{ width: `${IconWidth}rem` }} />
                   <div className="f1" />
-                  {formatNumber(warPower.value)}
+                  {formatNumber(warPower.total.value)}
                </div>
-            </BreakdownTooltip>
+            </WarPowerTooltip>
          </div>
          <div className="divider" />
          <div className="f1 row mx10 stretch">

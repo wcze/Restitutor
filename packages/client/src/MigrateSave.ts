@@ -9,7 +9,8 @@ import { GameOption } from "./game/GameOption";
 import { GameState, type SaveGame } from "./game/GameState";
 import { emptyRelation, fixRelations, getRelations } from "./game/logic/DiplomacyLogic";
 import { ensureHeir } from "./game/logic/GovernorLogic";
-import { initProvince, provinceResourceOf, setProvinceStat } from "./game/logic/ProvinceLogic";
+import { initProvince, setProvinceStat } from "./game/logic/ProvinceLogic";
+import { provinceResourceOf } from "./game/logic/ResourceLogic";
 import { socialClassInfluenceStat, socialClassLoyaltyStat } from "./game/logic/SocialClassLogic";
 
 export function migrateSave(save: SaveGame): void {
@@ -20,6 +21,18 @@ export function migrateSave(save: SaveGame): void {
    forEach(save.state.provinces, (province, data) => {
       data = Object.assign(initProvince(province, data.capital), data);
       save.state.provinces[province] = data;
+      if (save.options.version === 10) {
+         for (const type of ["InfantryUnitPower", "RangedUnitPower", "CavalryUnitPower"] as const) {
+            for (const modifiers of [data.modifiers[type], data.dynamicModifiers[type]]) {
+               for (const modifier of modifiers ?? []) {
+                  if (modifier.type === "add") {
+                     modifier.type = "multiply";
+                     modifier.value *= 0.5;
+                  }
+               }
+            }
+         }
+      }
       migrateFamily(data.governor, save.state.month);
       ensureHeir(province, save);
       const relations = getRelations(province, save);
@@ -84,6 +97,9 @@ export function migrateSave(save: SaveGame): void {
          }
       }
    });
+   if (save.options.version === 10) {
+      save.options.version = 11;
+   }
    fixRelations(save);
    for (const [tile, data] of save.state.tiles) {
       if (!data.autonomy) {

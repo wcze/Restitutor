@@ -25,7 +25,7 @@ For example, reduce a building's construction cost. Wrap your code in a function
 
 The [loader](../packages/client/src/LoadAddonMods.ts) runs enabled addons from installed Steam Workshop folders, not arbitrary local folders or browser development sessions. Reload the game after editing a script. You can subscribe to this [barebone example](https://steamcommunity.com/sharedfiles/filedetails/?id=3790897222) from Steam Workshop and modify its content to develop your addon before setting up your own Steam Workshop item.
 
-Addons run after save and scene initialization and game-loop startup, with access to three globals:
+Addons run after save and scene initialization and game-loop startup, with access to four globals: `G`, `GameStateUpdated`, `D`, and `UI`.
 
 ### G
 
@@ -86,9 +86,77 @@ When editing definitions:
 - Prefer existing identifiers. There is no registration or save-migration API for new entries.
 - Edits do not reinitialize saves or scenes. One-time derived data, such as goods prices, tiers, technology links, and the great-work tile lookup, is not rebuilt by `GameStateUpdated.emit()`.
 
+### UI
+
+`UI` exposes existing APIs. Use the host `UI.React`; panels render in the game's React tree with its theme and CSS. Do not bundle another React copy. Library versions follow the game's [dependencies](../packages/client/package.json).
+
+`UI.Mantine` exposes these [Mantine components](https://mantine.dev/core/package/), including compound members:
+
+| Category | Members of `UI.Mantine` |
+| --- | --- |
+| Inputs | `Checkbox`, `MultiSelect`, `SegmentedControl`, `Select`, `Slider`, `Switch`, `TextInput` |
+| Display | `Progress`, `ScrollArea` |
+| Overlays | `Menu`, `Popover`, `Tooltip` |
+| Utilities | `LoadingOverlay`, `Overlay`, `Portal`, `Transition` |
+
+Other exports (see source for signatures and props):
+
+| Members of `UI` | Source |
+| --- | --- |
+| `showPanel` | [Panel routing](../packages/client/src/ui/common/ShowPanel.tsx) |
+| `hideModal`, `ModalComp`, `ModalTitleBar`, `ModalImageHeader` | [Modals](../packages/client/src/utils/ModalManager.tsx) |
+| `hideSidebar` | [Sidebar manager](../packages/client/src/ui/common/SidebarManager.tsx) |
+| `SidebarComp`, `SidebarHeader`, `SidebarImageHeader` | [Sidebar frames](../packages/client/src/ui/common/SidebarComp.tsx) |
+| `Table` | [Sortable/virtualized table](../packages/client/src/ui/components/Table.tsx) |
+| `FloatingTip` | [Cursor-following tooltip](../packages/client/src/ui/components/FloatingTip.tsx) |
+| `TextureComp` | [Game textures](../packages/client/src/ui/components/TextureComp.tsx) |
+| `NumberSelect` | [Increment/decrement control](../packages/client/src/ui/components/NumberInput.tsx) |
+| `colorNumber`, `colorNumberReverse` | [Colored numbers](../packages/client/src/ui/components/ColorNumber.tsx) |
+| `IconCatalog` | [Icon URLs](../packages/client/src/ui/IconCatalog.ts) |
+| `useTypedEvent`, `refreshOnTypedEvent`, `refreshOnTypedEventWhen` | [Event hooks](../packages/client/src/utils/Hook.ts) |
+| `$t`, `L` | [Game strings and interpolation](../packages/client/src/utils/i18n.ts) |
+| `showInfo`, `showSuccess`, `showWarning`, `showError` | [Game alerts](../packages/client/src/game/logic/AlertLogic.ts) |
+
+#### Panels and updates
+
+`UI.showPanel(Component, props)` routes by function-name suffix:
+
+- `Modal`: opens a modal.
+- `SingletonModal`: deduplicates by component identity; reopening does not update props.
+- `Page`: replaces and opens the shared sidebar.
+
+Other names throw. Preserve function names when minifying and keep component identities stable. Supply a `ModalComp` or `SidebarComp` frame. `UI.hideModal()` closes the top modal; `UI.hideSidebar()` hides the current sidebar, regardless of addon ownership.
+
+For reactive game data, call `UI.refreshOnTypedEvent(GameStateUpdated)` and read `G.save` during render. Save objects mutate in place. Event hooks clean up on unmount.
+
+Minimal `index.js`:
+
+```js
+(() => {
+   const h = UI.React.createElement;
+
+   function HelloWorldSingletonModal() {
+      return h(
+         UI.ModalComp,
+         {
+            size: "sm",
+            title: h(UI.ModalTitleBar, { title: "My first addon", dismiss: true }),
+         },
+         h("div", { className: "m10" }, "Hello, world!"),
+      );
+   }
+
+   UI.showPanel(HelloWorldSingletonModal, {});
+})();
+```
+
+#### Styling
+
+Reuse [game styles](../packages/client/src/css/main.css), [buttons](../packages/client/src/css/button.css), and [utility classes](../packages/client/src/css/utils.css). Use `rem` for UI scaling and scope custom CSS to your addon.
+
 ## Total Conversion Mods
 
-Use a TC for changes to game code, UI, or initialization:
+Use a TC for changes to game code, initialization, or UI beyond the exposed addon APIs:
 
 1. Fork or clone the repository and follow the [development setup](../README.md#build).
 2. Make your changes. Run `pnpm run build` in the repository root to check TypeScript.

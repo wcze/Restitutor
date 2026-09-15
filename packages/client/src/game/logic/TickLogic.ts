@@ -1,4 +1,6 @@
-import { clamp, forEach, hasFlag, mapSafeAdd, range, setFlag } from "@project/shared/src/utils/Helper";
+import { clamp, forEach, formatDelta, hasFlag, mapSafeAdd, range, setFlag } from "@project/shared/src/utils/Helper";
+import { Fonts } from "../../Fonts";
+import { WorldScene } from "../../scenes/WorldScene";
 import { ChronicleModal } from "../../ui/ChronicleModal";
 import { showPanel } from "../../ui/common/ShowPanel";
 import { GreatWorkCompletedModal } from "../../ui/GreatWorkCompletedModal";
@@ -11,23 +13,21 @@ import type { SaveGame } from "../GameState";
 import { randomMaleName } from "../RomanNames";
 import { fixRelations } from "./DiplomacyLogic";
 import { getGameDate, monthToDate, tickToMonth, tickToYear } from "./GameDateTime";
+import { getChristianityYearly } from "./InternalAffairsLogic";
 import {
-   addProvinceResource,
    ConsulCandidatesCount,
    ConsulElectionMonths,
    clearProvincePrestigeRankingCache,
-   getChristianityYearly,
    getProvinceStat,
-   resetProvinceResource,
-   rollTradeOffers,
    setProvinceStat,
-   trySpendProvinceResources,
 } from "./ProvinceLogic";
+import { addProvinceResource, resetProvinceResource, trySpendProvinceResources } from "./ResourceLogic";
 import { addSocialClassInfluence, SocialClassInfluenceYearly } from "./SocialClassLogic";
 import { tickAI } from "./TickAI";
 import { tickProvince } from "./TickProvince";
 import { getTimedActionTimeLeft } from "./TimedActionLogic";
-import { getWarMonthlyMilitaryPoint, getWarSuccessChance, type IWar, WarLogFlag } from "./WarLogic";
+import { rollTradeOffers } from "./TradeLogic";
+import { getWarMonthlyMilitaryPoint, getWarPowerComparison, type IWar, WarLogFlag, WarResult } from "./WarLogic";
 
 export function tickLogic(save: SaveGame, dt: number, unscaled: number): void {
    save.state.tick++;
@@ -180,7 +180,13 @@ export function tickWar(war: IWar, save: SaveGame): void {
       return;
    }
    const militaryPoints = getWarMonthlyMilitaryPoint(war);
-   const successChance = getWarSuccessChance(war.attacker, war.coAttackers, war.defender, war.coDefenders, save);
+   const successChance = getWarPowerComparison(
+      war.attacker,
+      war.coAttackers,
+      war.defender,
+      war.coDefenders,
+      save,
+   ).successChance;
    if (trySpendProvinceResources({ military: militaryPoints }, war.attacker, save)) {
       const rolls = [Math.random(), Math.random(), Math.random()];
       const success = rolls.filter((roll) => roll < successChance).length >= Math.ceil(rolls.length / 2);
@@ -192,7 +198,7 @@ export function tickWar(war: IWar, save: SaveGame): void {
          if (forceAttack > 0) {
             setProvinceStat(
                "actualConscription",
-               getProvinceStat("actualConscription", war.attacker, save) * 0.9,
+               getProvinceStat("actualConscription", war.attacker, save) * 0.95,
                war.attacker,
                save,
             );
@@ -217,5 +223,16 @@ export function tickWar(war: IWar, save: SaveGame): void {
          result: "Stalled",
          flag: WarLogFlag.None,
       });
+   }
+   const scene = G.scene.getCurrent(WorldScene);
+   if (scene) {
+      const log = war.log[0];
+      const result = WarResult[log.result];
+      const forceAttack = hasFlag(log.flag, WarLogFlag.ForceAttack);
+      const score = forceAttack ? 0 : result.score;
+      const text = `${result.name()} ${formatDelta(score)}${forceAttack ? "*" : ""}`;
+      for (const tile of war.tiles) {
+         scene.showFloaterText({ tile, text, color: result.color, font: Fonts.TitleFont });
+      }
    }
 }

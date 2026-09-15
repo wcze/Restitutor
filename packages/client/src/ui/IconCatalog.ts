@@ -7,6 +7,7 @@ import Core from "../assets/images/Core.svg";
 import Decree from "../assets/images/Decree.svg";
 import Diplomat from "../assets/images/Diplomat.svg";
 import Diplomatic from "../assets/images/Diplomatic.svg";
+import Disaster from "../assets/images/Disaster.svg";
 import Discord from "../assets/images/Discord.svg";
 import Dissent from "../assets/images/Dissent.svg";
 import EcumenicalCouncil from "../assets/images/EcumenicalCouncil.svg";
@@ -89,5 +90,6 @@ export const IconCatalog = {
    WarOngoing,
    WarStalled,
    WarWarning,
+   Disaster,
    Wikipedia,
 } as const satisfies Record<string, string>;

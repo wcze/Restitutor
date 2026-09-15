@@ -5,7 +5,8 @@ import { getOriginalTileCount } from "../GameState";
 import type { ConditionChecks } from "../logic/Calculation";
 import { availableDiplomatChecks } from "../logic/DiplomacyLogic";
 import { forcePatronageEffect, isCoreTileChecks, maxCoreTileChecks } from "../logic/MissionLogic";
-import { getProvinceResource, getProvinceStability } from "../logic/ProvinceLogic";
+import { getProvinceStability } from "../logic/ProvinceLogic";
+import { getProvinceResource } from "../logic/ResourceLogic";
 import {
    requireMinimumAttitudeChecks,
    requireNoTreatyBetweenChecks,
@@ -306,6 +307,7 @@ export const AquitaniaEvent = {
       image: EventImage.DelphiOracle,
       desc: () => $t(L.AGallicAllianceDesc),
       condition: {
+         playerOnly: true,
          province: new Set(["Aquitania"]),
          onMap: { Lugdunensis: true },
          conditions: function* (province, save): ConditionChecks {

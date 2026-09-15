@@ -1,6 +1,5 @@
 import { Menu, Progress, ScrollArea, Switch } from "@mantine/core";
 import {
-   clamp,
    cls,
    compareBool,
    entriesOf,
@@ -13,6 +12,7 @@ import {
    toggleFlag,
 } from "@project/shared/src/utils/Helper";
 import { Fragment } from "react/jsx-runtime";
+import { AdjustAutonomyAction, SettleUnrestAction } from "../game/actions/AdjustAutonomyAction";
 import { ConvertToChristianityAction } from "../game/actions/ConvertToChristianityAction";
 import { Culture } from "../game/definitions/Culture";
 import { Modifiers, modifierValueToString } from "../game/definitions/Modifier";
@@ -21,24 +21,28 @@ import { getProvinceUpgradeDesc, hasProvinceUpgrade, ProvinceUpgrades } from "..
 import { Religion } from "../game/definitions/Religion";
 import { getTileName } from "../game/definitions/TileName";
 import { GameStateUpdated } from "../game/Events";
+import { getUpcomingDisasters } from "../game/events/DisasterLogic";
 import {
    getChristianityYearly,
    getCulturalCohesion,
+   getReligiousCohesion,
+   getToleratedCulture,
+   getToleratedReligion,
+} from "../game/logic/InternalAffairsLogic";
+import {
    getProgressToNextRestoration,
    getProvinceGoverningCapacity,
    getProvinceGoverningCost,
    getProvinceGreatWorks,
    getProvinceOverextension,
-   getProvinceResource,
    getProvinceStability,
-   getReligiousCohesion,
    getRestoration,
    getTilesAnnexedAndCored,
-   getToleratedCulture,
-   getToleratedReligion,
    TilesPerRestoration,
 } from "../game/logic/ProvinceLogic";
+import { getProvinceResource } from "../game/logic/ResourceLogic";
 import { getTileUnrest, isCapital } from "../game/logic/TileLogic";
+import { TimedActionDescComp } from "../game/logic/TimedActionDescComp";
 import { WorldScene } from "../scenes/WorldScene";
 import { G } from "../utils/Global";
 import { refreshOnTypedEvent } from "../utils/Hook";
@@ -54,6 +58,8 @@ import { SidebarComp, SidebarHeader } from "./common/SidebarComp";
 import { colorNumber, colorNumberReverse } from "./components/ColorNumber";
 import { FloatingTip } from "./components/FloatingTip";
 import { html } from "./components/RenderHTMLComp";
+import { DisasterCard } from "./DisasterCard";
+import { DisasterPage } from "./DisasterPage";
 import { GreatWorkComponent } from "./GreatWorkComponent";
 import { GreatWorksSingletonModal } from "./GreatWorksSingletonModal";
 import { MakeCoreButton } from "./MakeCoreButton";
@@ -96,6 +102,8 @@ export function InternalAffairsPage(): React.ReactNode {
    const toleratedReligionSlots = getToleratedReligion(G.save.state.playerProvince, G.save);
    const toleratedCultures = Array.from(state.toleratedCultures);
    const toleratedCultureSlots = getToleratedCulture(G.save.state.playerProvince, G.save);
+   const greatWorks = Array.from(getProvinceGreatWorks(G.save.state.playerProvince, G.save));
+   const nextDisaster = getUpcomingDisasters(G.save)[0];
    return (
       <SidebarComp title={<SidebarHeader title={$t(L.InternalAffairs)} />}>
          <div className="h1">{$t(L.GoverningAndStability)}</div>
@@ -169,7 +177,16 @@ export function InternalAffairsPage(): React.ReactNode {
          </FloatingTip>
          <div className="divider" />
          <div className="m10">
-            <FloatingTip label={() => html($t(L.SettleUnrestAutomaticallyEveryMonth$1, "0"))}>
+            <FloatingTip
+               fixedWidth
+               className="p0"
+               label={() => (
+                  <>
+                     <div className="m10">{$t(L.AutomaticallySettlePositiveUnrestDesc)}</div>
+                     <TimedActionDescComp action="AdjustAutonomy" />
+                  </>
+               )}
+            >
                <div className="row my5">
                   <div className="f1">{$t(L.AutomaticallySettleUnrest)}</div>
                   <Switch
@@ -222,6 +239,19 @@ export function InternalAffairsPage(): React.ReactNode {
             <TimedActionButton timedAction="RecruitTalents" />
             <TimedActionButton timedAction="RenewVestments" />
          </div>
+         {nextDisaster && (
+            <>
+               <div className="h1 row">
+                  <div className="f1">{$t(L.Disasters)}</div>
+                  <button className="btn text-sm" onClick={() => showPanel(DisasterPage, {})}>
+                     {$t(L.ShowAll)}
+                  </button>
+               </div>
+               <div className="m10">
+                  <DisasterCard disaster={nextDisaster} />
+               </div>
+            </>
+         )}
          <div className="h1">{$t(L.ProvincialSpirits)}</div>
          {Province[G.save.state.playerProvince].upgrades.map((upgrade, idx) => (
             <Fragment key={upgrade}>
@@ -234,11 +264,11 @@ export function InternalAffairsPage(): React.ReactNode {
          ))}
          <div className="h1">{$t(L.ProvincialGreatWorks)}</div>
          <div className="m10">
-            {Array.from(getProvinceGreatWorks(G.save.state.playerProvince, G.save)).map((gw) => (
+            {greatWorks.map((gw) => (
                <GreatWorkComponent key={gw} greatWork={gw} />
             ))}
          </div>
-         <div className="divider" />
+         {greatWorks.length > 0 && <div className="divider" />}
          <div className="m10">
             <button className="btn w100" onClick={() => showPanel(GreatWorksSingletonModal, {})}>
                {$t(L.ShowAllGreatWorks)}
@@ -508,29 +538,34 @@ export function InternalAffairsPage(): React.ReactNode {
                   <div className="row mx10 my5">
                      <div className="f1">{$t(L.Autonomy)}</div>
                      <div className="row g5">
-                        <FloatingTip label={() => $t(L.SetTileAutonomyTo$1, "0")}>
-                           <button
-                              className="btn text-xs"
-                              onClick={() => {
-                                 tileData.autonomy = 0;
-                                 GameStateUpdated.emit();
-                              }}
-                           >
-                              {$t(L.Reset)}
-                           </button>
-                        </FloatingTip>
-                        <FloatingTip label={() => $t(L.SettlingUnrestAdjustsAutonomySoThatTileUnrestIsAtMost$1, "0")}>
-                           <button
-                              className="btn text-xs"
-                              onClick={() => {
-                                 const unrest = getTileUnrest(tile, G.save).value;
-                                 tileData.autonomy = clamp(tileData.autonomy + Math.ceil(unrest), 0, 100);
-                                 GameStateUpdated.emit();
-                              }}
-                           >
-                              {$t(L.Settle)}
-                           </button>
-                        </FloatingTip>
+                        <ActionButton
+                           className="text-xs"
+                           action={() => AdjustAutonomyAction(tile, 0, G.save.state.playerProvince, G.save)}
+                           tooltip={(element) => (
+                              <>
+                                 <div className="m10">{$t(L.SetTileAutonomyTo$1, "0")}</div>
+                                 <TimedActionDescComp action="AdjustAutonomy" />
+                                 {element}
+                              </>
+                           )}
+                        >
+                           {$t(L.Reset)}
+                        </ActionButton>
+                        <ActionButton
+                           className="text-xs"
+                           action={() => SettleUnrestAction(tile, G.save.state.playerProvince, G.save)}
+                           tooltip={(element) => (
+                              <>
+                                 <div className="m10">
+                                    {$t(L.SettlingUnrestAdjustsAutonomySoThatTileUnrestIsAtMost$1, "0")}
+                                 </div>
+                                 <TimedActionDescComp action="AdjustAutonomy" />
+                                 {element}
+                              </>
+                           )}
+                        >
+                           {$t(L.Settle)}
+                        </ActionButton>
                      </div>
                      <div>{tileData.autonomy}</div>
                   </div>

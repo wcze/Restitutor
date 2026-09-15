@@ -33,6 +33,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       - run: |
           git add packages/client/src/version.json
-          git commit -m "[skip ci] New Build" || echo "There's nothing to commit"
+          BUILD_NUMBER=$(node -p "require('./packages/client/src/version.json').build")
+          git commit -m "[skip ci] New Build $BUILD_NUMBER" || echo "There's nothing to commit"
           git push
         working-directory: /home/insraq/Restitutor/

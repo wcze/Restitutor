@@ -9,6 +9,7 @@ import { addChronicleEntry } from "../definitions/Chronicle";
 import type { Province } from "../definitions/Province";
 import { RefreshTiles } from "../Events";
 import type { SaveGame } from "../GameState";
+import { toConditions } from "../logic/Calculation";
 import {
    addAttitudeModifier,
    getRelation,
@@ -19,11 +20,12 @@ import { hasLegacyUpgrade } from "../logic/LegacyUpgradeLogic";
 import { addModifier } from "../logic/ModifierLogic";
 import { addProvinceStat, getProvinceName } from "../logic/ProvinceLogic";
 import { showGameEventModal } from "../logic/TickProvince";
+import { requirePeaceBetweenChecks } from "../logic/TreatyLogic";
 import {
-   getTruceMonthsLeft,
    getWarCoalitions,
    getWarScore,
    getWarTiles,
+   requireNoTruceBetweenChecks,
    WarFlag,
    WarOneTimeDiplomaticPoint,
 } from "../logic/WarLogic";
@@ -39,7 +41,6 @@ export function DeclareWarAction(
    save: SaveGame,
 ): IGameAction {
    const warScore = getWarScore(attacker, defender, tiles, casusBelli, save);
-   const truceMonthsLeft = getTruceMonthsLeft(attacker, defender, save);
    const warTiles = getWarTiles(save);
    const warCoalitions = getWarCoalitions([attacker, defender], save);
    return {
@@ -67,10 +68,10 @@ export function DeclareWarAction(
             name: $t(L.WeHaveNotSelectedAnyTilesThatAreAlreadyInAWar),
             value: Array.from(tiles).every((tile) => !warTiles.has(tile)),
          },
-         {
-            name: $t(L.WeHaventAttackedThemYet),
-            value: !save.state.wars.some((war) => war.attacker === attacker && war.defender === defender),
-         },
+         ...toConditions(
+            requirePeaceBetweenChecks(attacker, defender, save),
+            requireNoTruceBetweenChecks(attacker, defender, save),
+         ),
          {
             name: $t(L.WeHaventGuaranteedTheirDefense),
             value: getRelation(attacker, defender, save)?.guaranteeDefense === undefined,
@@ -89,11 +90,6 @@ export function DeclareWarAction(
                           .join(", "),
                     )
                   : undefined,
-         },
-         {
-            name: $t(L.WeAreNotInATruceWithThem),
-            value: truceMonthsLeft <= 0,
-            desc: truceMonthsLeft > 0 ? $t(L.TruceWillEndIn$1Months, truceMonthsLeft) : undefined,
          },
          ...(casusBelli === "BarbarianRaid" ? [] : [isWithinDiplomaticRange(attacker, defender, save)]),
       ]),

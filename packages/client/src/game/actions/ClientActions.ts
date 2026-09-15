@@ -4,11 +4,13 @@ import type { Province } from "../definitions/Province";
 import { TimedActions } from "../definitions/TimedAction";
 import { RefreshTiles } from "../Events";
 import type { SaveGame } from "../GameState";
+import { toConditions } from "../logic/Calculation";
 import { getAnnexClientCost, getRelation } from "../logic/DiplomacyLogic";
 import { addModifier } from "../logic/ModifierLogic";
-import { addProvinceResource, getProvinceName } from "../logic/ProvinceLogic";
+import { getProvinceName } from "../logic/ProvinceLogic";
+import { addProvinceResource } from "../logic/ResourceLogic";
 import { startTimedAction, timedActionConditions } from "../logic/TimedActionLogic";
-import { getWarsBetween } from "../logic/WarLogic";
+import { requirePeaceBetweenChecks } from "../logic/TreatyLogic";
 import { EmptyGameAction } from "./EmptyGameAction";
 import { finalizeCondition, type IGameAction } from "./GameAction";
 
@@ -25,10 +27,7 @@ export function SummonGovernorAction(ourProvince: Province, clientProvince: Prov
             name: $t(L.TheyAreOurClient),
             value: usToThem.treaty?.type === "Patron" && themToUs.treaty?.type === "Client",
          },
-         {
-            name: $t(L.WeAreNotAtWarWithThem),
-            value: getWarsBetween(ourProvince, clientProvince, save).length === 0,
-         },
+         ...toConditions(requirePeaceBetweenChecks(ourProvince, clientProvince, save)),
       ]),
       execute: () => {
          startTimedAction("SummonGovernor", ourProvince, save);
@@ -75,10 +74,7 @@ export function RequestMilitaryAidAction(ourProvince: Province, clientProvince: 
             name: $t(L.TheyAreOurClient),
             value: usToThem.treaty?.type === "Patron" && themToUs.treaty?.type === "Client",
          },
-         {
-            name: $t(L.WeAreNotAtWarWithThem),
-            value: getWarsBetween(ourProvince, clientProvince, save).length === 0,
-         },
+         ...toConditions(requirePeaceBetweenChecks(ourProvince, clientProvince, save)),
       ]),
       execute: () => {
          startTimedAction("RequestMilitaryAid", ourProvince, save);
@@ -123,10 +119,7 @@ export function AnnexClientAction(ourProvince: Province, clientProvince: Provinc
             name: $t(L.TheyAreOurClient),
             value: usToThem.treaty?.type === "Patron" && themToUs.treaty?.type === "Client",
          },
-         {
-            name: $t(L.WeAreNotAtWarWithThem),
-            value: getWarsBetween(ourProvince, clientProvince, save).length === 0,
-         },
+         ...toConditions(requirePeaceBetweenChecks(ourProvince, clientProvince, save)),
       ]),
       execute: () => {
          startTimedAction("AnnexClient", ourProvince, save);

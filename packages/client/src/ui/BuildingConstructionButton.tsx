@@ -6,6 +6,7 @@ import { ProvinceResourceNames } from "../game/definitions/Province";
 import { G } from "../utils/Global";
 import { $t, L } from "../utils/i18n";
 import { ActionButton } from "./ActionButton";
+import { ProvinceResourceImages } from "./ProvinceResourceImages";
 
 export function BuildingConstructionButton({
    building,
@@ -31,15 +32,19 @@ export function BuildingConstructionButton({
             {maintenance.length > 0 && (
                <>
                   <div className="h2">{$t(L.MonthlyMaintenanceCost)}</div>
-                  {maintenance.map(([resource, cost]) => (
-                     <div className="row mx10 my5" key={resource}>
-                        <div className="f1">{ProvinceResourceNames[resource]()}</div>
-                        <div>
-                           {cost}
-                           <span className="text-dimmed text-xs">{$t(L.SlashMonth)}</span>
+                  {maintenance.map(([resource, cost]) => {
+                     const icon = ProvinceResourceImages[resource];
+                     return (
+                        <div className="row mx10 my5 g5" key={resource}>
+                           {icon && <img src={icon} className="icon-block" />}
+                           <div className="f1">{ProvinceResourceNames[resource]()}</div>
+                           <div>
+                              {cost}
+                              <span className="text-dimmed text-xs">{$t(L.SlashMonth)}</span>
+                           </div>
                         </div>
-                     </div>
-                  ))}
+                     );
+                  })}
                </>
             )}
          </>

@@ -1,8 +1,6 @@
 import {
    clamp,
-   clearFlag,
    formatNumber,
-   hasFlag,
    pointToTile,
    type Tile,
    tileToPoint,
@@ -12,14 +10,14 @@ import { $t, L } from "../../utils/i18n";
 import type { ICondition, IConditionBreakdown } from "../actions/GameAction";
 import { finalizeBreakdown, finalizeCondition, type IValueBreakdown, makeValueBreakdown } from "../actions/GameAction";
 import { CasusBelli } from "../definitions/CasusBelli";
-import { PersonFlags } from "../definitions/Family";
 import type { Province } from "../definitions/Province";
 import { hasProvinceUpgrade, ProvinceUpgrades } from "../definitions/ProvinceUpgrades";
 import { getBorderingProvinces } from "../definitions/Tile";
 import { getTileName } from "../definitions/TileName";
 import type { SaveGame } from "../GameState";
 import { MapGrid } from "../MapGrid";
-import type { ConditionChecks } from "./Calculation";
+import { type ArmyUnitPowers, ArmyUnits, getArmyUnitPowers, getWarPower, type IWarPowerBreakdown } from "./ArmyLogic";
+import { type ConditionChecks, toConditions } from "./Calculation";
 import {
    getAttitudeTowards,
    getDiplomaticDistance,
@@ -33,15 +31,10 @@ import {
    getProvinceName,
    getProvincePrestige,
    getProvinceStat,
-   getProvinceTileCount,
-   getWarPower,
    isLandlocked,
    isTileConnectedBySea,
-   provinceResourceOf,
-   setProvinceStat,
 } from "./ProvinceLogic";
 import { getTileDefense, getTileTerrain } from "./TileLogic";
-import { endTimedActionAndResetCooldown, getTimedActionTimeLeft } from "./TimedActionLogic";
 
 export const WarFlag = {
    None: 0,
@@ -63,7 +56,7 @@ export interface IWar {
    flag: WarFlag;
 }
 
-type WarResult = "Success" | "Repelled" | "Stalled";
+export type WarResult = keyof typeof WarResult;
 
 export const WarLogFlag = {
    None: 0,
@@ -80,23 +73,12 @@ export interface IWarLog {
    flag: WarLogFlag;
 }
 
-export const WarResultScore = {
-   Success: 1,
-   Repelled: -1,
-   Stalled: 0,
-} as const satisfies Record<WarResult, number>;
-
-export const WarResultNames: Record<WarResult, () => string> = {
-   Success: () => $t(L.Success),
-   Repelled: () => $t(L.Repelled),
-   Stalled: () => $t(L.Stalled),
+export const WarResult = {
+   Success: { name: () => $t(L.Success), score: 1, color: 0x288a51 },
+   Repelled: { name: () => $t(L.Repelled), score: -1, color: 0xc0392b },
+   Stalled: { name: () => $t(L.Stalled), score: 0, color: 0x34495e },
 } as const;
 
-export const MaxConscription = 50;
-export const MinConscription = 5;
-export const MinArmyMaintenance = 50;
-export const MaxArmyMaintenance = 100;
-export const ArmyMoraleMonthlyIncrease = 10;
 export const BreachOfThePeaceDurationYear = 5;
 
 function getCoDefenders(attacker: Province, defender: Province, save: SaveGame): Map<Province, IConditionBreakdown> {
@@ -112,19 +94,40 @@ function getCoDefenders(attacker: Province, defender: Province, save: SaveGame):
       const treaty = relation.treaty?.type;
       switch (treaty) {
          case "Alliance":
-            result.set(coDefender, finalizeCondition([{ name: $t(L.TheyAreDefendersAlly), value: true }]));
+            result.set(
+               coDefender,
+               finalizeCondition([
+                  { name: $t(L.TheyAreDefendersAlly), value: true },
+                  ...toConditions(requireNoTruceBetweenChecks(attacker, coDefender, save)),
+               ]),
+            );
             break;
          case "DefensePact":
             result.set(
                coDefender,
-               finalizeCondition([{ name: $t(L.TheyHaveADefensePactWithTheDefender), value: true }]),
+               finalizeCondition([
+                  { name: $t(L.TheyHaveADefensePactWithTheDefender), value: true },
+                  ...toConditions(requireNoTruceBetweenChecks(attacker, coDefender, save)),
+               ]),
             );
             break;
          case "Client":
-            result.set(coDefender, finalizeCondition([{ name: $t(L.TheyAreDefendersPatron), value: true }]));
+            result.set(
+               coDefender,
+               finalizeCondition([
+                  { name: $t(L.TheyAreDefendersPatron), value: true },
+                  ...toConditions(requireNoTruceBetweenChecks(attacker, coDefender, save)),
+               ]),
+            );
             break;
          case "Patron":
-            result.set(coDefender, finalizeCondition([{ name: $t(L.TheyAreDefendersClient), value: true }]));
+            result.set(
+               coDefender,
+               finalizeCondition([
+                  { name: $t(L.TheyAreDefendersClient), value: true },
+                  ...toConditions(requireNoTruceBetweenChecks(attacker, coDefender, save)),
+               ]),
+            );
             break;
          case undefined:
             break;
@@ -165,7 +168,7 @@ function getCoAttackers(attacker: Province, defender: Province, save: SaveGame):
                   { name: $t(L.TheyAreAttackersAlly), value: true },
                   {
                      name: $t(L.TheyAreNotADefenderOrCoDefender),
-                     value: coAttacker !== defender && !coDefenders.has(coAttacker),
+                     value: coAttacker !== defender && !(coDefenders.get(coAttacker)?.value ?? false),
                   },
                   {
                      name: $t(L.TheirAttitudeTowardsUsIsHigherThanTheDefenders),
@@ -176,6 +179,7 @@ function getCoAttackers(attacker: Province, defender: Province, save: SaveGame):
                         formatNumber(attackerTowardsDefender.value),
                      ),
                   },
+                  ...toConditions(requireNoTruceBetweenChecks(defender, coAttacker, save)),
                ]),
             );
             break;
@@ -187,8 +191,9 @@ function getCoAttackers(attacker: Province, defender: Province, save: SaveGame):
                   { name: $t(L.TheyAreAttackersClient), value: true },
                   {
                      name: $t(L.TheyAreNotADefenderOrCoDefender),
-                     value: coAttacker !== defender && !coDefenders.has(coAttacker),
+                     value: coAttacker !== defender && !(coDefenders.get(coAttacker)?.value ?? false),
                   },
+                  ...toConditions(requireNoTruceBetweenChecks(defender, coAttacker, save)),
                ]),
             );
             break;
@@ -355,6 +360,18 @@ export function getTruceMonthsLeft(fromProvince: Province, toProvince: Province,
    return clamp(truceUntil - save.state.month, 0, Number.POSITIVE_INFINITY);
 }
 
+export function* requireNoTruceBetweenChecks(
+   ourProvince: Province,
+   theirProvince: Province,
+   save: SaveGame,
+): ConditionChecks {
+   const truceMonthsLeft = getTruceMonthsLeft(ourProvince, theirProvince, save);
+   (yield truceMonthsLeft === 0)?.describe(
+      $t(L.NoTruceBetween$1And$2, getProvinceName(ourProvince, save), getProvinceName(theirProvince, save)),
+      { desc: truceMonthsLeft > 0 ? $t(L.TruceWillEndIn$1Months, truceMonthsLeft) : undefined },
+   );
+}
+
 export function nullifyTruce(fromProvince: Province, toProvince: Province, save: SaveGame): void {
    const fromTo = getRelation(fromProvince, toProvince, save);
    const toFrom = getRelation(toProvince, fromProvince, save);
@@ -497,28 +514,6 @@ export function isDefending(war: IWar, province: Province): boolean {
    return war.defender === province || war.coDefenders.has(province);
 }
 
-export function getWarSuccessChance(
-   attacker: Province,
-   coAttackers: Map<Province, IConditionBreakdown>,
-   defender: Province,
-   coDefenders: Map<Province, IConditionBreakdown>,
-   save: SaveGame,
-): number {
-   const attackerPowers =
-      getWarPower(attacker, save).value +
-      Array.from(coAttackers).reduce(
-         (acc, [province, condition]) => acc + (condition.value ? getWarPower(province, save).value : 0),
-         0,
-      );
-   const defenderPowers =
-      getWarPower(defender, save).value +
-      Array.from(coDefenders).reduce(
-         (acc, [province, condition]) => acc + (condition.value ? getWarPower(province, save).value : 0),
-         0,
-      );
-   return attackerPowers / (attackerPowers + defenderPowers);
-}
-
 export function getWarEstimatedTime(warScore: number, successChance: number): number {
    const p = successChance;
    const eSuccess = p ** 2 * (3 - 2 * p);
@@ -535,106 +530,60 @@ export function isWarStalled(war: IWar, save: SaveGame): boolean {
 
 export const WhitePeaceCostPerTile = 20;
 
-export function getInfantryUnitWarPower(province: Province, save: SaveGame): IValueBreakdown {
-   const result = makeValueBreakdown();
-   result.add.push({
-      name: $t(L.BasePower),
-      value: 1,
-   });
-   const infantrySkill = getProvinceStat("infantrySkill", province, save);
-   if (infantrySkill > 0) {
-      result.add.push({
-         name: $t(L.GeneralInfantrySkill),
-         value: infantrySkill,
-      });
+function getCoalitionUnitPowers(
+   leader: Province,
+   followers: Map<Province, IConditionBreakdown>,
+   save: SaveGame,
+): ArmyUnitPowers {
+   const powers = getArmyUnitPowers(leader, save);
+   for (const [province, condition] of followers) {
+      if (!condition.value || province === leader) {
+         continue;
+      }
+      const contribution = getArmyUnitPowers(province, save);
+      for (const unit of ArmyUnits) {
+         powers[unit] += contribution[unit];
+      }
    }
-   attachModifiers("InfantryUnitPower", result, province, save);
-   return finalizeBreakdown(result);
+   return powers;
 }
 
-export function getRangedUnitWarPower(province: Province, save: SaveGame): IValueBreakdown {
-   const result = makeValueBreakdown();
-   result.add.push({
-      name: $t(L.BasePower),
-      value: 2,
-   });
-   const rangedSkill = getProvinceStat("rangedSkill", province, save);
-   if (rangedSkill > 0) {
-      result.add.push({
-         name: $t(L.GeneralRangedSkill),
-         value: rangedSkill,
-      });
-   }
-   attachModifiers("RangedUnitPower", result, province, save);
-   return finalizeBreakdown(result);
+export interface IWarPowerSide {
+   powers: Map<Province, IWarPowerBreakdown>;
+   value: number;
+   enemy: ArmyUnitPowers;
 }
 
-export function getCavalryUnitWarPower(province: Province, save: SaveGame): IValueBreakdown {
-   const result = makeValueBreakdown();
-   result.add.push({
-      name: $t(L.BasePower),
-      value: 3,
-   });
-   const cavalrySkill = getProvinceStat("cavalrySkill", province, save);
-   if (cavalrySkill > 0) {
-      result.add.push({
-         name: $t(L.GeneralCavalrySkill),
-         value: cavalrySkill,
-      });
-   }
-   attachModifiers("CavalryUnitPower", result, province, save);
-   return finalizeBreakdown(result);
+export interface IWarPowerComparison {
+   attack: IWarPowerSide;
+   defense: IWarPowerSide;
+   successChance: number;
 }
 
-export type GeneralType = "Recruit" | "Governor";
-
-export function getCurrentGeneral(province: Province, save: SaveGame): GeneralType | undefined {
-   const state = save.state.provinces[province];
-   if (!state) {
-      return undefined;
-   }
-   if (hasFlag(state.governor.male.flag, PersonFlags.IsGeneral)) {
-      return "Governor";
-   }
-   if (getTimedActionTimeLeft("RecruitAGeneral", province, save) > 0) {
-      return "Recruit";
-   }
-   return undefined;
-}
-
-export function onGeneralEnded(province: Province, save: SaveGame): void {
-   const sp = provinceResourceOf("generalSkillPoint", province, save);
-   sp[0] = Math.floor(sp[0] / 2);
-   sp[1] = 0;
-   setProvinceStat("infantrySkill", 0, province, save);
-   setProvinceStat("rangedSkill", 0, province, save);
-   setProvinceStat("cavalrySkill", 0, province, save);
-}
-
-export function hasGeneralCondition(province: Province, save: SaveGame): ICondition {
-   return {
-      name: $t(L.CurrentlyHasAGeneral),
-      value: getCurrentGeneral(province, save) !== undefined,
+export function getWarPowerComparison(
+   attacker: Province,
+   coAttackers: Map<Province, IConditionBreakdown>,
+   defender: Province,
+   coDefenders: Map<Province, IConditionBreakdown>,
+   save: SaveGame,
+): IWarPowerComparison {
+   const attackerUnits = getCoalitionUnitPowers(attacker, coAttackers, save);
+   const defenderUnits = getCoalitionUnitPowers(defender, coDefenders, save);
+   const makeSide = (leader: Province, followers: Map<Province, IConditionBreakdown>, enemy: ArmyUnitPowers) => {
+      const powers = new Map<Province, IWarPowerBreakdown>();
+      powers.set(leader, getWarPower({ enemy }, leader, save));
+      for (const [province, condition] of followers) {
+         if (condition.value && province !== leader) {
+            powers.set(province, getWarPower({ enemy }, province, save));
+         }
+      }
+      const value = Array.from(powers.values()).reduce((total, power) => total + power.total.value, 0);
+      return { powers, value, enemy };
    };
-}
-
-export function* hasGeneralChecks(province: Province, save: SaveGame): ConditionChecks {
-   (yield getCurrentGeneral(province, save) !== undefined)?.describe($t(L.CurrentlyHasAGeneral));
-}
-
-export function dismissGeneral(province: Province, save: SaveGame): void {
-   const state = save.state.provinces[province];
-   if (!state) {
-      return;
-   }
-   const governor = state.governor.male;
-   governor.flag = clearFlag(governor.flag, PersonFlags.IsGeneral);
-   endTimedActionAndResetCooldown("RecruitAGeneral", province, save);
-   onGeneralEnded(province, save);
-}
-
-export function getGeneralSkillUpgradeCost(level: number): number {
-   return level;
+   const attack = makeSide(attacker, coAttackers, defenderUnits);
+   const defense = makeSide(defender, coDefenders, attackerUnits);
+   const total = attack.value + defense.value;
+   return { attack, defense, successChance: total > 0 ? attack.value / total : 0.5 };
 }
 
 export function getWarCoalitions(provinces: Province[], save: SaveGame): IWar[] {
@@ -644,6 +593,10 @@ export function getWarCoalitions(provinces: Province[], save: SaveGame): IWar[] 
          provinces.every((province) => war.coDefenders.has(province))
       );
    });
+}
+
+export function getPlunderedUpgrade(upgrade: number, reduction: number): number {
+   return clamp(Math.floor(upgrade * reduction), 1, upgrade - 1);
 }
 
 export function getWarPlunder(war: IWar, save: SaveGame): { tiles: IValueBreakdown; warScore: IValueBreakdown } {
@@ -656,21 +609,21 @@ export function getWarPlunder(war: IWar, save: SaveGame): { tiles: IValueBreakdo
             tilesResult.add.push({
                name: getTileName(tile, save),
                desc: $t(L.Infrastructure),
-               value: -1,
+               value: -getPlunderedUpgrade(data.infrastructure, 0.2),
             });
          }
          if (data.production > 1) {
             tilesResult.add.push({
                name: getTileName(tile, save),
                desc: $t(L.Production),
-               value: -1,
+               value: -getPlunderedUpgrade(data.production, 0.2),
             });
          }
          if (data.population > 1) {
             tilesResult.add.push({
                name: getTileName(tile, save),
                desc: $t(L.Population),
-               value: -1,
+               value: -getPlunderedUpgrade(data.population, 0.2),
             });
          }
       }
@@ -684,32 +637,6 @@ export function getWarPlunder(war: IWar, save: SaveGame): { tiles: IValueBreakdo
       tiles: tilesResult,
       warScore: finalizeBreakdown(warScoreResult),
    };
-}
-
-export function getWarPowerPerTile(province: Province, save: SaveGame): number {
-   const tileCount = getProvinceTileCount(province, save);
-   if (tileCount === 0) {
-      return 0;
-   }
-   return getWarPower(province, save).value / tileCount;
-}
-export function setProvinceArmyMaintenance(value: number, province: Province, save: SaveGame): void {
-   value = clamp(value, MinArmyMaintenance, MaxArmyMaintenance);
-   if (value < getProvinceStat("armyMorale", province, save)) {
-      setProvinceStat("armyMorale", value, province, save);
-   }
-   setProvinceStat("armyMaintenance", value, province, save);
-}
-export function setProvinceTargetConscription(value: number, province: Province, save: SaveGame): void {
-   const state = save.state.provinces[province];
-   if (!state) {
-      return;
-   }
-   const targetConscription = clamp(value, MinConscription, MaxConscription);
-   if (targetConscription < getProvinceStat("actualConscription", province, save)) {
-      setProvinceStat("actualConscription", targetConscription, province, save);
-   }
-   setProvinceStat("targetConscription", targetConscription, province, save);
 }
 
 export function isWarOngoing(war: IWar, save: SaveGame): boolean {
