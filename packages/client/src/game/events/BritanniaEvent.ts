@@ -378,7 +378,7 @@ export const BritanniaEvent = {
          province: new Set(["Britannia"]),
          conditions: function* (province, save): ConditionChecks {
             yield* manpowerChecks(4500, province, save);
-            yield* provinceRevenueChecks(1500, province, save);
+            yield* provinceRevenueChecks(1000, province, save);
             return;
          },
       },

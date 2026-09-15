@@ -10,18 +10,14 @@ import { Tiles } from "./definitions/TileConstants";
 import { getTileName } from "./definitions/TileName";
 import { LugdunensisEvent } from "./events/LugdunensisEvent";
 import type { SaveGame } from "./GameState";
+import { getCurrentGeneral } from "./logic/ArmyLogic";
 import { addAttitudeModifier, BaseDiplomats, getAttitudeTowards, getRelation } from "./logic/DiplomacyLogic";
 import { addModifier } from "./logic/ModifierLogic";
-import {
-   ConsulCandidatesCount,
-   ConsulElectionMonths,
-   fillOfferAmount,
-   getProvinceResource,
-   getProvinceStat,
-   getProvinceTrades,
-} from "./logic/ProvinceLogic";
+import { ConsulCandidatesCount, ConsulElectionMonths, getProvinceStat } from "./logic/ProvinceLogic";
+import { getProvinceResource } from "./logic/ResourceLogic";
 import { getTimedActionTimeLeft } from "./logic/TimedActionLogic";
-import { getCurrentGeneral, getCurrentWars, WarOneTimeDiplomaticPoint } from "./logic/WarLogic";
+import { fillOfferAmount, getProvinceTrades } from "./logic/TradeLogic";
+import { getCurrentWars, WarOneTimeDiplomaticPoint } from "./logic/WarLogic";
 import { provinceSel, techSel } from "./ProvinceSelector";
 
 const TutorialEnemyProvince: Province = "Belgica" as const;
@@ -111,7 +107,7 @@ export const Tutorial: ITutorial[] = [
          }
          return [0, 1];
       },
-      selectors: [provinceSel("Belgica"), "#DiplomacyPage_Infiltrate_Belgica"],
+      selectors: [provinceSel("Belgica"), "#TilePage_Diplomacy_Belgica", "#DiplomacyPage_Infiltrate_Belgica"],
    },
    {
       id: "Unpause",
@@ -172,8 +168,8 @@ export const Tutorial: ITutorial[] = [
             modifier: "WarPower",
             name: $t(L.Tutorial),
             type: "multiply",
-            value: -0.3,
-            duration: 12 * 2,
+            value: -0.5,
+            duration: 12 * 3,
             province: "Belgica",
             save,
          });
@@ -201,7 +197,11 @@ export const Tutorial: ITutorial[] = [
          }
          return [0, 1];
       },
-      selectors: ["#LeftPanel_OngoingWar_0.animate-bounce-right", "#WarModal_SignPeaceTreaty"],
+      selectors: [
+         "#LeftPanel_OngoingWar_0.animate-bounce-right",
+         "#WarModal_SignPeaceTreaty",
+         "#PeaceTreatyModal_SignPeaceTreaty",
+      ],
    },
    {
       id: "MakeCore",
@@ -240,7 +240,7 @@ export const Tutorial: ITutorial[] = [
          }
          return [0, 1];
       },
-      selectors: ["#TopPanel_WarPower", "#ArmyModal_ArmyMaintenance"],
+      selectors: ["#TopPanel_WarPower", "#ArmyModal_ArmyMaintenance", "#ArmyModal_LowerArmyMaintenanceConfirm"],
    },
    {
       id: "UpgradeGeneralSkill",

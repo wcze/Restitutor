@@ -2,10 +2,10 @@ import { $t, L } from "../../utils/i18n";
 import type { Province, TradeOffer } from "../definitions/Province";
 import { TimedActions } from "../definitions/TimedAction";
 import type { SaveGame } from "../GameState";
+import { toConditions } from "../logic/Calculation";
 import { getRelation, isWithinDiplomaticRange } from "../logic/DiplomacyLogic";
 import { startTimedAction, timedActionConditions } from "../logic/TimedActionLogic";
-import { requireMinimumAttitude } from "../logic/TreatyLogic";
-import { getWarsBetween } from "../logic/WarLogic";
+import { requireMinimumAttitude, requirePeaceBetweenChecks } from "../logic/TreatyLogic";
 import { finalizeCondition, type IGameAction, type IGameCostCondition } from "./GameAction";
 
 export const MinimumTradeAttitude = -10;
@@ -20,10 +20,7 @@ export function CanTradeCostCondition(
       condition: finalizeCondition([
          ...timedActionConditions({ action: "TradeGoods" }, ourProvince, save),
          isWithinDiplomaticRange(ourProvince, theirProvince, save),
-         {
-            name: $t(L.WeAreNotAtWarWithThem),
-            value: getWarsBetween(ourProvince, theirProvince, save).length === 0,
-         },
+         ...toConditions(requirePeaceBetweenChecks(ourProvince, theirProvince, save)),
          requireMinimumAttitude(theirProvince, ourProvince, MinimumTradeAttitude, save),
          {
             name: $t(L.WeDontAlreadyHaveAnActiveTradeWithThem),

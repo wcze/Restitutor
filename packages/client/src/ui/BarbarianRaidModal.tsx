@@ -7,6 +7,7 @@ import { BarbarianRaidNegativeEffect, MaxRaidMonths } from "../game/definitions/
 import { getTileName } from "../game/definitions/TileName";
 import { TimedActions } from "../game/definitions/TimedAction";
 import { GameStateUpdated } from "../game/Events";
+import { getWarPower } from "../game/logic/ArmyLogic";
 import {
    addAttitudeModifier,
    getAttitudeTowards,
@@ -14,7 +15,7 @@ import {
    requireInfiltration,
 } from "../game/logic/DiplomacyLogic";
 import { addModifier } from "../game/logic/ModifierLogic";
-import { getProvinceName, getTotalUpgrades, getWarPower } from "../game/logic/ProvinceLogic";
+import { getProvinceName, getTotalUpgrades } from "../game/logic/ProvinceLogic";
 import { getTimedActionTimeLeft, startTimedAction, timedActionConditions } from "../game/logic/TimedActionLogic";
 import { G } from "../utils/Global";
 import { refreshOnTypedEvent } from "../utils/Hook";
@@ -26,6 +27,7 @@ import { colorNumber } from "./components/ColorNumber";
 import { FloatingTip } from "./components/FloatingTip";
 import { HeaderImages } from "./HeaderImages";
 import { Grid2 } from "./UIConstant";
+import { WarPowerTooltip } from "./WarPowerTooltip";
 
 export function BarbarianRaidModal(): React.ReactNode {
    refreshOnTypedEvent(GameStateUpdated);
@@ -54,7 +56,7 @@ export function BarbarianRaidModal(): React.ReactNode {
                      .filter((war) => war.casusBelli === "BarbarianRaid")
                      .sort((a, b) => a.attacker.localeCompare(b.attacker))
                      .map((raid) => {
-                        const warPower = getWarPower(raid.attacker, G.save);
+                        const warPower = getWarPower({}, raid.attacker, G.save);
                         const attitude = getAttitudeTowards(raid.attacker, G.save.state.playerProvince, G.save);
                         return (
                            <tr key={raid.attacker}>
@@ -84,7 +86,7 @@ export function BarbarianRaidModal(): React.ReactNode {
                                  </BreakdownTooltip>
                               </td>
                               <td>
-                                 <BreakdownTooltip
+                                 <WarPowerTooltip
                                     breakdown={warPower}
                                     tooltip={(element) => (
                                        <>
@@ -102,7 +104,7 @@ export function BarbarianRaidModal(): React.ReactNode {
                                     )}
                                  >
                                     <div>
-                                       <div>{formatNumber(warPower.value)}</div>
+                                       <div>{formatNumber(warPower.total.value)}</div>
                                        <div className="row g5 text-dimmed">
                                           <div className="mi xs">schedule</div>
                                           <div className="f1">
@@ -110,7 +112,7 @@ export function BarbarianRaidModal(): React.ReactNode {
                                           </div>
                                        </div>
                                     </div>
-                                 </BreakdownTooltip>
+                                 </WarPowerTooltip>
                               </td>
                               <td>
                                  {raid && (

@@ -1,6 +1,7 @@
 import { formatNumber } from "@project/shared/src/utils/Helper";
 import { useState } from "react";
 import { GameStateUpdated } from "../game/Events";
+import { getWarPower } from "../game/logic/ArmyLogic";
 import { monthToDate } from "../game/logic/GameDateTime";
 import {
    getProvinceIncome,
@@ -9,7 +10,6 @@ import {
    getProvincePrestigeRanking,
    getProvinceStability,
    getProvinceTileCount,
-   getWarPower,
 } from "../game/logic/ProvinceLogic";
 import { G } from "../utils/Global";
 import { refreshOnTypedEvent } from "../utils/Hook";
@@ -19,6 +19,7 @@ import { BreakdownTooltip } from "./BreakdownRow";
 import { colorNumber } from "./components/ColorNumber";
 import { FloatingTip } from "./components/FloatingTip";
 import { Table } from "./components/Table";
+import { WarPowerTooltip } from "./WarPowerTooltip";
 
 export function ProvinceListSingletonModal(): React.ReactNode {
    refreshOnTypedEvent(GameStateUpdated);
@@ -31,7 +32,7 @@ export function ProvinceListSingletonModal(): React.ReactNode {
       tiles: getProvinceTileCount(province, G.save),
       income: getProvinceIncome(province, G.save).income,
       stability: getProvinceStability(province, G.save),
-      warPower: getWarPower(province, G.save),
+      warPower: getWarPower({}, province, G.save),
    }));
    return (
       <ModalComp
@@ -69,7 +70,11 @@ export function ProvinceListSingletonModal(): React.ReactNode {
                         header: $t(L.Stability),
                         compare: (a, b) => a.stability.value - b.stability.value,
                      },
-                     { id: "warPower", header: $t(L.WarPower), compare: (a, b) => a.warPower.value - b.warPower.value },
+                     {
+                        id: "warPower",
+                        header: $t(L.WarPower),
+                        compare: (a, b) => a.warPower.total.value - b.warPower.total.value,
+                     },
                   ]}
                   rowProps={(row) => ({
                      className: row.province === G.save.state.playerProvince ? "text-yellow text-bold" : "",
@@ -98,9 +103,9 @@ export function ProvinceListSingletonModal(): React.ReactNode {
                            </BreakdownTooltip>
                         </td>
                         <td>
-                           <BreakdownTooltip breakdown={row.warPower}>
-                              <div>{formatNumber(row.warPower.value)}</div>
-                           </BreakdownTooltip>
+                           <WarPowerTooltip breakdown={row.warPower}>
+                              <div>{formatNumber(row.warPower.total.value)}</div>
+                           </WarPowerTooltip>
                         </td>
                      </>
                   )}

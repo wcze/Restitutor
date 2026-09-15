@@ -1,5 +1,6 @@
 import { getTileName } from "../game/definitions/TileName";
 import { EventImage } from "../game/events/EventImages";
+import type { PeaceTreatyOption } from "../game/logic/PeaceTreatyLogic";
 import type { IWar } from "../game/logic/WarLogic";
 import { G } from "../utils/Global";
 import { $t, L } from "../utils/i18n";
@@ -9,7 +10,13 @@ import { GameEventButton } from "./GameEventModal";
 import { GenericEventModal } from "./GenericEventModal";
 import { PeaceTreatyTooltip } from "./PeaceTreatyTooltip";
 
-export function InvaderConqueredWarGoalModal({ war }: { war: IWar }): React.ReactNode {
+export function InvaderConqueredWarGoalModal({
+   war,
+   peaceTreatyOption,
+}: {
+   war: IWar;
+   peaceTreatyOption: PeaceTreatyOption;
+}): React.ReactNode {
    const warGoal = Array.from(war.tiles)
       .map((tile) => getTileName(tile, G.save))
       .join(", ");
@@ -22,7 +29,7 @@ export function InvaderConqueredWarGoalModal({ war }: { war: IWar }): React.Reac
          buttons={[
             <GameEventButton
                key="0"
-               tooltip={<PeaceTreatyTooltip war={war} />}
+               tooltip={<PeaceTreatyTooltip war={war} peaceTreatyOption={peaceTreatyOption} />}
                label={$t(L.ATerribleLossIndeed)}
                onClick={() => {
                   hideModal();

@@ -113,13 +113,6 @@ export function requireMinimumAttitude(from: Province, to: Province, attitude: n
    };
 }
 
-export function requirePeaceBetween(ourProvince: Province, theirProvince: Province, save: SaveGame): ICondition {
-   return {
-      name: $t(L.$1IsNotAtWarWith$2, getProvinceName(ourProvince, save), getProvinceName(theirProvince, save)),
-      value: getWarsBetween(ourProvince, theirProvince, save).length === 0,
-   };
-}
-
 export function requireNoTreatyBetween(
    treaties: Exclude<Treaty, "Client">[],
    fromProvince: Province,
@@ -307,7 +300,9 @@ export function getTreatyMonthLeft(fromProvince: Province, toProvince: Province,
    return clamp(monthLeft, 0, Number.POSITIVE_INFINITY);
 }
 
-export const SabotageCost = TimedActions.TreatySabotaged.duration;
+function getSabotageCost(): number {
+   return TimedActions.TreatySabotaged.duration;
+}
 
 export function requireDefensePactAllyOrPatronCount(province: Province, count: number, save: SaveGame): ICondition {
    const relations = getRelations(province, save);
@@ -332,7 +327,7 @@ export function requireDefensePactAllyOrPatronCount(province: Province, count: n
 export function canSabotage(fromProvince: Province, toProvince: Province, save: SaveGame): IConditionBreakdown {
    return finalizeCondition([
       requireDefensePactAllyOrPatronCount(fromProvince, 2, save),
-      requireInfiltration(SabotageCost, { consume: true }, save.state.playerProvince, fromProvince, save),
+      requireInfiltration(getSabotageCost(), { consume: true }, save.state.playerProvince, fromProvince, save),
    ]);
 }
 
@@ -340,8 +335,8 @@ export function trySabotage(fromProvince: Province, toProvince: Province, save: 
    if (!canSabotage(fromProvince, toProvince, save)) {
       return false;
    }
-   tryUseInfiltration(SabotageCost, save.state.playerProvince, toProvince, save);
-   tryUseInfiltration(SabotageCost, save.state.playerProvince, fromProvince, save);
+   tryUseInfiltration(getSabotageCost(), save.state.playerProvince, toProvince, save);
+   tryUseInfiltration(getSabotageCost(), save.state.playerProvince, fromProvince, save);
    dissolveTreaty(fromProvince, toProvince, save);
    return true;
 }

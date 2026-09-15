@@ -1,3 +1,4 @@
+import { rgbToHex } from "@project/shared/src/thirdparty/RandomColor";
 import { safeParseInt } from "@project/shared/src/utils/Helper";
 import type { HTMLReactParserOptions } from "html-react-parser";
 import parse from "html-react-parser";
@@ -7,6 +8,8 @@ import { MapBackgroundColors } from "../game/logic/MapColor";
 import { getProvinceName } from "../game/logic/ProvinceLogic";
 import { WorldScene } from "../scenes/WorldScene";
 import { G } from "../utils/Global";
+import { $t, L } from "../utils/i18n";
+import { FloatingTip } from "./components/FloatingTip";
 import { IconCatalog } from "./IconCatalog";
 
 const parserOptions: HTMLReactParserOptions = {
@@ -20,23 +23,34 @@ const parserOptions: HTMLReactParserOptions = {
          const text = node.children[0].data;
          const province = text as Province;
          if (Provinces.includes(province as Province)) {
-            return (
-               <span
-                  className="text-link"
-                  style={{ color: `#${MapBackgroundColors[province].toString(16)}` }}
-                  onClick={() => {
-                     const state = G.save.state.provinces[province];
-                     if (!state) {
-                        return;
-                     }
-                     G.scene
-                        .getCurrent(WorldScene)
-                        ?.lookAt(state.capital, { time: 0.2 })
-                        .then((scene) => scene.drawProvinceOutline(province));
-                  }}
-               >
-                  {getProvinceName(province, G.save)}
+            const content = (
+               <span>
+                  <span
+                     className="text-link"
+                     style={{ color: rgbToHex(MapBackgroundColors[province]) }}
+                     onClick={() => {
+                        const state = G.save.state.provinces[province];
+                        if (!state) {
+                           return;
+                        }
+                        G.scene
+                           .getCurrent(WorldScene)
+                           ?.lookAt(state.capital, { time: 0.2 })
+                           .then((scene) => scene.drawProvinceOutline(province));
+                     }}
+                  >
+                     {getProvinceName(province, G.save)}
+                  </span>
+                  {G.save.state.provinces[province] ? "" : "*"}
                </span>
+            );
+            if (G.save.state.provinces[province]) {
+               return content;
+            }
+            return (
+               <FloatingTip label={() => $t(L.$1DoesNotCurrentlyExistOnTheMap, getProvinceName(province, G.save))}>
+                  {content}
+               </FloatingTip>
             );
          }
       }
@@ -48,7 +62,7 @@ const parserOptions: HTMLReactParserOptions = {
       ) {
          const tile = safeParseInt(node.children[0].data);
          const tileData = G.save.state.tiles.get(tile);
-         if (tileData) {
+         if (tileData || getTileName(tile, G.save)) {
             return (
                <span
                   className="text-link"
@@ -58,7 +72,9 @@ const parserOptions: HTMLReactParserOptions = {
                         ?.lookAt(tile, { time: 0.2 })
                         .then((scene) => {
                            scene.drawSelectors(new Set([tile]));
-                           scene.drawProvinceOutline(tileData.province);
+                           if (tileData) {
+                              scene.drawProvinceOutline(tileData.province);
+                           }
                         });
                   }}
                >

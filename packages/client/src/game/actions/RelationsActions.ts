@@ -3,6 +3,7 @@ import type { Province } from "../definitions/Province";
 import { isChristianReligion } from "../definitions/Religion";
 import { TimedActions } from "../definitions/TimedAction";
 import type { SaveGame } from "../GameState";
+import { toConditions } from "../logic/Calculation";
 import {
    addAttitudeModifier,
    cancelImproveRelations,
@@ -18,8 +19,7 @@ import {
 import { addModifier } from "../logic/ModifierLogic";
 import { getProvinceName, getTotalUpgrades } from "../logic/ProvinceLogic";
 import { startTimedAction, timedActionConditions } from "../logic/TimedActionLogic";
-import { requireHigherPrestige } from "../logic/TreatyLogic";
-import { getWarsBetween } from "../logic/WarLogic";
+import { requireHigherPrestige, requirePeaceBetweenChecks } from "../logic/TreatyLogic";
 import { EmptyGameAction } from "./EmptyGameAction";
 import { finalizeCondition, type IGameAction } from "./GameAction";
 
@@ -70,10 +70,7 @@ export function GuaranteeDefenseAction(ourProvince: Province, theirProvince: Pro
       condition: finalizeCondition([
          ...timedActionConditions({ action: "GuaranteeDefense" }, ourProvince, save),
          isWithinDiplomaticRange(ourProvince, theirProvince, save),
-         {
-            name: $t(L.WeAreNotAtWarWithThem),
-            value: getWarsBetween(ourProvince, theirProvince, save).length === 0,
-         },
+         ...toConditions(requirePeaceBetweenChecks(ourProvince, theirProvince, save)),
          {
             name: $t(L.WeHaventGuaranteedTheirDefense),
             value: relation.guaranteeDefense === undefined,

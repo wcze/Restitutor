@@ -7,4 +7,6 @@ export interface PanelIdentity {
 export interface ShowModalEvent {
    Component: PanelIdentity;
    content: ReactElement;
+   id: number;
+   immediate?: boolean;
 }

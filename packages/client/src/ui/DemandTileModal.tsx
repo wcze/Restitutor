@@ -19,6 +19,7 @@ import { $t, L } from "../utils/i18n";
 import { hideModal, ModalComp, ModalTitleBar } from "../utils/ModalManager";
 import { html } from "./components/RenderHTMLComp";
 import { DiceRollComp } from "./DiceRollDisplay";
+import { renderMarkup } from "./ParseMarkup";
 
 export function DemandTileModal({ province }: { province: Province }): React.ReactNode {
    const [selectedTile, setSelectedTile] = useState<Tile | null>(null);
@@ -201,13 +202,8 @@ function DemandAcceptedConsequences({ tile }: { tile: Tile }): React.ReactNode {
    return (
       <ul className="m10">
          <li>
-            {html(
-               $t(
-                  L.$1ShallCede$2To$3,
-                  getProvinceName(tileData.province, G.save),
-                  getTileName(tile, G.save),
-                  getProvinceName(G.save.state.playerProvince, G.save),
-               ),
+            {renderMarkup(
+               $t(L.$1ShallCede$2To$3, tileData.province, `<Tile>${tile}</Tile>`, G.save.state.playerProvince),
             )}
          </li>
          <li>

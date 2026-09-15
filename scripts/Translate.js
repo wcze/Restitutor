@@ -35,11 +35,11 @@ function findKeysWithHtml(translations) {
 
 function collectWrappedTCallPositions(content) {
    const wrappedTCallPositions = new Set();
-   const htmlRe = /\bhtml\(/g;
+   const htmlRe = /\b(?:html|renderMarkup)\(/g;
    let htmlMatch;
 
    while ((htmlMatch = htmlRe.exec(content)) !== null) {
-      const htmlArgs = parseCallArgs(content, htmlMatch.index + 5);
+      const htmlArgs = parseCallArgs(content, htmlMatch.index + htmlMatch[0].length);
       for (const arg of htmlArgs) {
          const tRe = /\$t\(/g;
          let tMatch;
@@ -154,14 +154,14 @@ function main() {
             }
          }
 
-         // Check html() wrapper (only in .tsx files; must use `html` from RenderHTMLComp, not an alias)
+         // Check HTML-aware wrappers (html from RenderHTMLComp or renderMarkup from ParseMarkup).
          if (filePath.endsWith(".tsx") && keysWithHtml.has(key)) {
             if (!wrappedTCallPositions.has(match.index)) {
                const lineNum = getLineNumber(lineStarts, match.index);
                console.log(`❌ ${filePath}:${lineNum}`);
                console.log(`   Key: L.${key}`);
                console.log(`   Value: "${sourceTranslations[key]}"`);
-               console.log(`   HTML tags in content require html() wrapper`);
+               console.log(`   HTML tags in content require html() or renderMarkup() wrapper`);
                const line = getLineText(content, lineStarts, lineNum).trim();
                console.log(`   Call: ${line}`);
                htmlWrapperMissing = true;

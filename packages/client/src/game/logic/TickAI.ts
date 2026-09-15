@@ -50,6 +50,16 @@ import { SocialClass } from "../definitions/SocialClass";
 import { MaxRaidMonths, SpawnedProvinces } from "../definitions/SpawnedProvince";
 import { applyGameEffect } from "../GameEffect";
 import type { SaveGame } from "../GameState";
+import {
+   getArmyComposition,
+   MaxArmyMaintenance,
+   MaxConscription,
+   MinArmyMaintenance,
+   MinConscription,
+   setArmyComposition,
+   setProvinceArmyMaintenance,
+   setProvinceTargetConscription,
+} from "./ArmyLogic";
 import { getProvinceTilesCached } from "./CacheLogic";
 import {
    cancelImproveRelations,
@@ -60,6 +70,8 @@ import {
    improveRelations,
 } from "./DiplomacyLogic";
 import { getGameDate } from "./GameDateTime";
+import { getToleratedCulture, getToleratedReligion } from "./InternalAffairsLogic";
+import { getAvailablePeaceTreatyOptions } from "./PeaceTreatyLogic";
 import {
    ensureProductionCapacity,
    getProvinceProductionCapacity,
@@ -71,16 +83,12 @@ import {
    getProvinceGoverningCapacity,
    getProvinceGoverningCost,
    getProvinceIncome,
-   getProvinceResource,
    getProvinceStat,
    getProvincesByDistance,
    getProvincesInRange,
-   getToleratedCulture,
-   getToleratedReligion,
-   hasEnoughProvinceResources,
    pledgeProvinceConsulVotes,
-   trySpendProvinceResources,
 } from "./ProvinceLogic";
+import { getProvinceResource, hasEnoughProvinceResources, trySpendProvinceResources } from "./ResourceLogic";
 import { getCheapestLockedTech } from "./TechLogic";
 import { getBuildingSlot, getTileUnrest, getTileWar } from "./TileLogic";
 import {
@@ -96,15 +104,9 @@ import {
    getWarEstimatedTime,
    getWarMonthlyMilitaryPoint,
    getWarParticipants,
+   getWarPowerComparison,
    getWarScore,
-   getWarSuccessChance,
    getWarTiles,
-   MaxArmyMaintenance,
-   MaxConscription,
-   MinArmyMaintenance,
-   MinConscription,
-   setProvinceArmyMaintenance,
-   setProvinceTargetConscription,
 } from "./WarLogic";
 
 const AIWarMaxUnrest = 20;
@@ -276,7 +278,7 @@ export function tickAI(save: SaveGame): void {
                MaxConscription,
             );
             const targetConscription = clamp(
-               DefaultConscription + getProvinceStat("defendCount", province, save) * MinConscription,
+               DefaultConscription + getProvinceStat("defendCount", province, save) * 2,
                MinConscription,
                maxTargetConscription,
             );
@@ -309,6 +311,7 @@ export function tickAI(save: SaveGame): void {
       doDenounce(province, save);
       doFocus(province, save);
       doDiplomacy(province, save);
+      doArmyComposition(province, save);
       doGeneralUpgrade(province, save);
       lookForSpouse(state.governor, province, save);
       if (getTimedActionTimeLeft("BarbarianInvasions", province, save) > 0) {
@@ -373,6 +376,26 @@ function getReligionToTolerate(province: Province, save: SaveGame): Religion | u
       }
    }
    return mostCommon;
+}
+
+function doArmyComposition(province: Province, save: SaveGame): void {
+   const state = save.state.provinces[province];
+   if (!state) {
+      return;
+   }
+   if (getTimedActionCooldownLeft("AdjustArmyComposition", province, save) > 0) {
+      return;
+   }
+   const { infantry, ranged, cavalry } = getArmyComposition(province, save);
+   const reduce = state.loans.length > 0 || getProvinceIncome(province, save).income <= 0;
+   const defendCount = getProvinceStat("defendCount", province, save);
+   const increase = Math.round(Math.min(1, infantry / 2));
+   setArmyComposition(
+      reduce ? Math.max(0, ranged - 1) : clamp(ranged + increase, 0, defendCount * 2),
+      reduce ? Math.max(0, cavalry - 1) : clamp(cavalry + increase, 0, defendCount),
+      province,
+      save,
+   );
 }
 
 function doGeneralUpgrade(province: Province, save: SaveGame): void {
@@ -449,7 +472,8 @@ function doRaid(province: Province, save: SaveGame): void {
    for (const currentWar of save.state.wars.filter((war) => war.attacker === province)) {
       if (currentWar.actualWarScore >= currentWar.requiredWarScore) {
          logAI(`${province} ends raid on ${currentWar.defender} after victory`);
-         tryDoHeadless(SignPeaceTreatyAction(currentWar, province, save), "SignPeaceTreaty", province, save);
+         const option = randOne(getAvailablePeaceTreatyOptions(currentWar, save));
+         tryDoHeadless(SignPeaceTreatyAction(currentWar, province, option, save), "SignPeaceTreaty", province, save);
          continue;
       }
       if (currentWar.log.length > MaxRaidMonths) {
@@ -516,7 +540,8 @@ function doWar(province: Province, save: SaveGame): void {
       }
       if (currentWar.actualWarScore >= currentWar.requiredWarScore) {
          logAI(`${province} signs peace treaty with ${currentWar.defender}`);
-         tryDoHeadless(SignPeaceTreatyAction(currentWar, province, save), "SignPeaceTreaty", province, save);
+         const option = randOne(getAvailablePeaceTreatyOptions(currentWar, save));
+         tryDoHeadless(SignPeaceTreatyAction(currentWar, province, option, save), "SignPeaceTreaty", province, save);
          continue;
       }
       if (getAverageUnrest(province, save) > AIWarMaxUnrest) {
@@ -525,13 +550,13 @@ function doWar(province: Province, save: SaveGame): void {
          continue;
       }
       if (
-         getWarSuccessChance(
+         getWarPowerComparison(
             currentWar.attacker,
             currentWar.coAttackers,
             currentWar.defender,
             currentWar.coDefenders,
             save,
-         ) <= 0.5
+         ).successChance <= 0.5
       ) {
          const action = NegotiateWhitePeaceAction(currentWar, province, save);
          logAI(`${province} negotiates white peace with ${currentWar.defender} due to low success chance`);
@@ -879,7 +904,13 @@ function findWarGoal(province: Province, save: SaveGame): { tile: Tile; estimate
       if (!canDoAction(action, province, save)) {
          continue;
       }
-      const successChance = getWarSuccessChance(province, coAttackers, otherProvince, coDefenders, save);
+      const successChance = getWarPowerComparison(
+         province,
+         coAttackers,
+         otherProvince,
+         coDefenders,
+         save,
+      ).successChance;
       if (successChance <= 0.5) {
          continue;
       }

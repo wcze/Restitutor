@@ -23,9 +23,10 @@ import type { TimedAction } from "./definitions/TimedAction";
 import { GameStateUpdated, RefreshTiles } from "./Events";
 import { resetGame, saveGame } from "./LoadSave";
 import { monthToDate } from "./logic/GameDateTime";
-import { ensureHeir, findFamilyById } from "./logic/GovernorLogic";
+import { ensureHeir, findFamilyById, GovernorMaxExcl, GovernorMinIncl } from "./logic/GovernorLogic";
 import { rebirth } from "./logic/LegacyUpgradeLogic";
-import { addProvinceResource, GovernorMaxExcl, GovernorMinIncl, spawnProvince } from "./logic/ProvinceLogic";
+import { spawnProvince } from "./logic/ProvinceLogic";
+import { addProvinceResource } from "./logic/ResourceLogic";
 import { addGameEvent } from "./logic/TickProvince";
 import { settleTile } from "./logic/TileLogic";
 import { startTimedAction } from "./logic/TimedActionLogic";
@@ -148,7 +149,7 @@ export function addDebugFunctions(): void {
    };
    // @ts-expect-error
    globalThis.invaderConqueredWarGoal = () => {
-      showPanel(InvaderConqueredWarGoalModal, { war: warOnUs });
+      showPanel(InvaderConqueredWarGoalModal, { war: warOnUs, peaceTreatyOption: "Demilitarization" });
    };
    // @ts-expect-error
    globalThis.warEnded = () => {

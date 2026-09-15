@@ -3,6 +3,7 @@ import { unlockAchievement } from "../Achievement";
 import { addChronicleEntry } from "../definitions/Chronicle";
 import type { Province } from "../definitions/Province";
 import type { SaveGame } from "../GameState";
+import { toConditions } from "../logic/Calculation";
 import {
    availableDiplomatCondition,
    getRelation,
@@ -15,7 +16,7 @@ import {
    requireHigherPrestige,
    requireMinimumAttitude,
    requireNoTreatyBetween,
-   requirePeaceBetween,
+   requirePeaceBetweenChecks,
 } from "../logic/TreatyLogic";
 import { finalizeCondition, type IGameAction } from "./GameAction";
 
@@ -27,7 +28,7 @@ export function OfferDefensePactAction(fromProvince: Province, toProvince: Provi
 
          requireNoTreatyBetween(["DefensePact", "Alliance", "Patron"], fromProvince, toProvince, save),
 
-         requirePeaceBetween(fromProvince, toProvince, save),
+         ...toConditions(requirePeaceBetweenChecks(fromProvince, toProvince, save)),
          requireHigherPrestige(fromProvince, toProvince, 1, save),
          availableDiplomatCondition(fromProvince, toProvince, save),
          isWithinDiplomaticRange(fromProvince, toProvince, save),
@@ -63,7 +64,7 @@ export function OfferAllianceAction(fromProvince: Province, toProvince: Province
 
          requireNoTreatyBetween(["Alliance", "Patron"], fromProvince, toProvince, save),
 
-         requirePeaceBetween(fromProvince, toProvince, save),
+         ...toConditions(requirePeaceBetweenChecks(fromProvince, toProvince, save)),
          requireHigherPrestige(fromProvince, toProvince, 1.25, save),
          availableDiplomatCondition(fromProvince, toProvince, save),
          isWithinDiplomaticRange(fromProvince, toProvince, save),
@@ -99,7 +100,7 @@ export function OfferPatronageAction(fromProvince: Province, toProvince: Provinc
 
          requireNoTreatyBetween(["Patron"], fromProvince, toProvince, save),
 
-         requirePeaceBetween(fromProvince, toProvince, save),
+         ...toConditions(requirePeaceBetweenChecks(fromProvince, toProvince, save)),
          requireHigherPrestige(fromProvince, toProvince, 5, save),
          availableDiplomatCondition(fromProvince, toProvince, save),
          isWithinDiplomaticRange(fromProvince, toProvince, save),

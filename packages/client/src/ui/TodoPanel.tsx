@@ -1,35 +1,34 @@
-import { cls, entriesOf, forEach, formatNumber } from "@project/shared/src/utils/Helper";
+import { cls, entriesOf, forEach, formatNumber, hasFlag } from "@project/shared/src/utils/Helper";
 import { UpgradeGeneralSkillAction } from "../game/actions/ArmyGeneralAction";
 import { canDoAction } from "../game/actions/GameAction";
 import { CanTradeCostCondition } from "../game/actions/TradeActions";
 import { Goods } from "../game/definitions/Goods";
-import { type Province, TreatyNames } from "../game/definitions/Province";
+import { type Province, ProvinceFlags, TreatyNames } from "../game/definitions/Province";
 import { SocialClass } from "../game/definitions/SocialClass";
 import { Tech } from "../game/definitions/Tech";
 import { getTileName } from "../game/definitions/TileName";
 import { TimedActions } from "../game/definitions/TimedAction";
+import { getLoomingDisasters } from "../game/events/DisasterLogic";
+import { GameEvents } from "../game/events/GameEvents";
 import type { SaveGame } from "../game/GameState";
+import { getCurrentGeneral } from "../game/logic/ArmyLogic";
 import { getCurrentRelations, getDiplomats, getRelations } from "../game/logic/DiplomacyLogic";
 import { getOngoingEcumenicalCouncil } from "../game/logic/EcumenicalCouncilLogic";
+import { formatYear, getGameDate } from "../game/logic/GameDateTime";
 import { getEligibleForMarriage } from "../game/logic/GovernorLogic";
 import { getLegacyUpgradeCost } from "../game/logic/LegacyUpgradeLogic";
 import { getProvinceProductionCapacity, getProvinceUsedProductionCapacity } from "../game/logic/ProductionLogic";
-import {
-   getProvinceName,
-   getProvinceOverextension,
-   getProvinceResource,
-   monthsToNextConsulElection,
-} from "../game/logic/ProvinceLogic";
+import { getProvinceName, getProvinceOverextension, monthsToNextConsulElection } from "../game/logic/ProvinceLogic";
+import { getProvinceResource } from "../game/logic/ResourceLogic";
 import { isSocialClassDisloyal, isSocialClassDominant } from "../game/logic/SocialClassLogic";
 import { getTechsCanBeResearched, hasResearched } from "../game/logic/TechLogic";
 import { PendingGameEventTimeoutMonths } from "../game/logic/TickProvince";
 import { getTileUnrest } from "../game/logic/TileLogic";
 import { getTimedActionTimeLeft, makeGameAction } from "../game/logic/TimedActionLogic";
 import {
-   getCurrentGeneral,
    getCurrentWars,
    getTruceMonthsLeft,
-   getWarSuccessChance,
+   getWarPowerComparison,
    type IWar,
    isWarStalled,
 } from "../game/logic/WarLogic";
@@ -43,6 +42,7 @@ import { showPanel } from "./common/ShowPanel";
 import { FloatingTip } from "./components/FloatingTip";
 import { html } from "./components/RenderHTMLComp";
 import { DiplomacyPage } from "./DiplomacyPage";
+import { DisasterPage } from "./DisasterPage";
 import { EcumenicalCouncilPage } from "./EcumenicalCouncilPage";
 import { FamilyTreeSingletonModal } from "./FamilyTreeSingletonModal";
 import { GameEventModal } from "./GameEventModal";
@@ -99,13 +99,13 @@ function WarTodo(war: IWar, index: number): [string, ITodo] {
       name: (save) => $t(L.$1$2War, getProvinceName(war.attacker, save), getProvinceName(war.defender, save)),
       icon: (save) => {
          if (war.attacker === save.state.playerProvince) {
-            const successChance = getWarSuccessChance(
+            const successChance = getWarPowerComparison(
                war.attacker,
                war.coAttackers,
                war.defender,
                war.coDefenders,
                save,
-            );
+            ).successChance;
             if (war.actualWarScore >= war.requiredWarScore) {
                return IconCatalog.WarOngoing;
             }
@@ -120,13 +120,13 @@ function WarTodo(war: IWar, index: number): [string, ITodo] {
       },
       className: (save) => {
          if (war.attacker === save.state.playerProvince) {
-            const successChance = getWarSuccessChance(
+            const successChance = getWarPowerComparison(
                war.attacker,
                war.coAttackers,
                war.defender,
                war.coDefenders,
                save,
-            );
+            ).successChance;
             if (war.actualWarScore >= war.requiredWarScore) {
                return "green animate-bounce-right";
             }
@@ -188,6 +188,38 @@ const Rebellions: ITodo = {
    },
    onClick: (save) => {
       showPanel(InternalAffairsPage, {});
+   },
+};
+
+const LoomingDisasters: ITodo = {
+   name: () => $t(L.LoomingDisasters),
+   icon: () => IconCatalog.Disaster,
+   className: () => "red",
+   tooltip: (save) => {
+      const disasters = getLoomingDisasters(save);
+      if (disasters.length === 0) {
+         return null;
+      }
+      return (
+         <div className="m10">
+            <div>{$t(L.TheFollowingDisastersAreLooming)}</div>
+            <ul>
+               {disasters.map((disaster) => {
+                  const yearsLeft = disaster.year - getGameDate(save.state.tick).getFullYear();
+                  return (
+                     <li key={disaster.event}>
+                        {GameEvents[disaster.event].name()} ({formatYear(disaster.year)},{" "}
+                        {$t(L.In$1Years, formatNumber(yearsLeft))})
+                     </li>
+                  );
+               })}
+            </ul>
+            <div>{$t(L.ClickToViewDetails)}</div>
+         </div>
+      );
+   },
+   onClick: () => {
+      showPanel(DisasterPage, {});
    },
 };
 
@@ -269,6 +301,10 @@ const PledgeSupportToConsulCandidates: ITodo = {
    icon: (save) => IconCatalog.Senate,
    className: (save) => "yellow",
    tooltip: (save) => {
+      const state = save.state.provinces[save.state.playerProvince];
+      if (!state || hasFlag(state.flags, ProvinceFlags.AutomaticallyPledgeSupport)) {
+         return null;
+      }
       const votes = save.state.senate.votes.get(save.state.playerProvince)?.size ?? 0;
       if (votes < 2) {
          return <div className="m10">{$t(L.PledgeSupportConsulElectionTooltip)}</div>;
@@ -725,10 +761,11 @@ const PendingGameEvent: ITodo = {
 };
 
 const _Todos = {
-   Rebellions,
-   SocialClassDissent,
    ProvinceBankrupt,
+   Rebellions,
+   LoomingDisasters,
    BarbarianRaid,
+   SocialClassDissent,
    EcumenicalCouncil,
    TooFewRivals,
    VacantArmyGeneral,
